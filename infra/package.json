@@ -1,0 +1,13 @@
+{
+    "name": "infra",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "deploy": "sst deploy",
+        "dev": "sst dev"
+    },
+    "dependencies": {
+        "sst": "^3.3.0"
+    }
+}

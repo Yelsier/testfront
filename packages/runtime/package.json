@@ -1,0 +1,15 @@
+{
+    "name": "runtime",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "main": "./index.tsx",
+    "types": "./index.tsx",
+    "exports": {
+        ".": "./index.tsx"
+    },
+    "peerDependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    }
+}
