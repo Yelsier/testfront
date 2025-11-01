@@ -54,15 +54,10 @@ export default $config({
       }
     });
 
-    // 3. CloudFront para distribución global
-    // - Assets estáticos (*.js, *.css, etc) → S3
-    // - HTML pages → Lambda SSR/ISR
+    // 3. CloudFront para distribución global con caching edge
     const cdn = new sst.aws.Router("CdnRouter", {
       routes: {
-        "/client.js": $interpolate`https://${bucket.domain}/client.js`,
-        "/chunks/*": $interpolate`https://${bucket.domain}/chunks/*`,
-        "/assets/*": $interpolate`https://${bucket.domain}/assets/*`,
-        "/*": handler.url // Todo lo demás va al Lambda
+        "/*": handler.url
       },
       transform: {
         cdn: {
