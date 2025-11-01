@@ -36,6 +36,7 @@ export default $config({
       environment: {
         BUCKET_NAME: bucket.name,
         BUCKET_URL: bucket.domain,
+        // CDN_URL se añadirá después
       },
       permissions: [
         {
@@ -53,10 +54,15 @@ export default $config({
       }
     });
 
-    // 3. CloudFront para distribución global con caching edge
+    // 3. CloudFront para distribución global
+    // - Assets estáticos (*.js, *.css, etc) → S3
+    // - HTML pages → Lambda SSR/ISR
     const cdn = new sst.aws.Router("CdnRouter", {
       routes: {
-        "/*": handler.url
+        "/client.js": $interpolate`https://${bucket.domain}/client.js`,
+        "/chunks/*": $interpolate`https://${bucket.domain}/chunks/*`,
+        "/assets/*": $interpolate`https://${bucket.domain}/assets/*`,
+        "/*": handler.url // Todo lo demás va al Lambda
       },
       transform: {
         cdn: {

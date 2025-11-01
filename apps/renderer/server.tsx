@@ -36,9 +36,10 @@ async function resolve(path: string): Promise<ResolveResponse> {
 export async function handle(event: { rawPath: string; headers: Record<string, string> }) {
   const data = await resolve(event.rawPath || "/");
 
-  // URL del bucket para assets
-  const bucketUrl = process.env.BUCKET_URL || "";
-  const clientJsUrl = bucketUrl ? `https://${bucketUrl}/client.js` : "/client.js";
+  // Usar ruta relativa - CloudFront se encarga del routing
+  // En producción: CloudFront sirve /client.js desde S3
+  // En desarrollo local: se sirve desde dist/
+  const clientJsUrl = "/client.js";
 
   const html = renderToString(
     <html lang="es">
