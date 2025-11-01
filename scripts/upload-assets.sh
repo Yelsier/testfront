@@ -16,13 +16,23 @@ echo "📦 Building assets..."
 cd "$(dirname "$0")/../apps/renderer"
 pnpm build
 
-# Subir client.js al bucket (ahora con nombre fijo)
+# Subir client.js al bucket con compresión gzip
 echo "⬆️  Uploading client.js to S3..."
 if [ -f "dist/client.js" ]; then
-  aws s3 cp dist/client.js "s3://${BUCKET_NAME}/client.js" \
+  # Comprimir con gzip
+  echo "🗜️  Compressing with gzip..."
+  gzip -9 -c dist/client.js > dist/client.js.gz
+  
+  # Subir versión comprimida con headers correctos
+  aws s3 cp dist/client.js.gz "s3://${BUCKET_NAME}/client.js" \
     --content-type "application/javascript" \
+    --content-encoding "gzip" \
     --cache-control "public, max-age=31536000, immutable"
-  echo "✅ client.js uploaded!"
+  
+  echo "✅ client.js uploaded (gzipped: $(du -h dist/client.js.gz | cut -f1))"
+  
+  # Limpiar temporal
+  rm dist/client.js.gz
 else
   echo "❌ Error: dist/client.js not found"
   echo "Available files:"
@@ -33,9 +43,19 @@ fi
 # Subir chunks y assets opcionales
 if [ -d "dist/chunks" ]; then
   echo "⬆️  Uploading chunks..."
-  aws s3 sync dist/chunks/ "s3://${BUCKET_NAME}/chunks/" \
-    --content-type "application/javascript" \
-    --cache-control "public, max-age=31536000, immutable"
+  # Comprimir y subir cada chunk
+  for file in dist/chunks/*.js; do
+    if [ -f "$file" ]; then
+      filename=$(basename "$file")
+      gzip -9 -c "$file" > "$file.gz"
+      aws s3 cp "$file.gz" "s3://${BUCKET_NAME}/chunks/$filename" \
+        --content-type "application/javascript" \
+        --content-encoding "gzip" \
+        --cache-control "public, max-age=31536000, immutable"
+      rm "$file.gz"
+    fi
+  done
+  echo "✅ Chunks uploaded (gzipped)"
 fi
 
 if [ -d "dist/assets" ]; then
