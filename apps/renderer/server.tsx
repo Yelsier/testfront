@@ -49,6 +49,8 @@ export async function handle(event: { rawPath: string; headers: Record<string, s
         {data.seo?.description && (
           <meta name="description" content={data.seo.description} />
         )}
+        {/* Preload client.js para descarga paralela */}
+        <link rel="modulepreload" href={clientJsUrl} />
       </head>
       <body>
         <div id="root">
