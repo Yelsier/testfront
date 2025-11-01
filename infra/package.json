@@ -4,8 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "deploy": "sst deploy",
-        "dev": "sst dev"
+        "deploy": "sst deploy"
     },
     "dependencies": {
         "sst": "^3.3.0"
