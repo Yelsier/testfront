@@ -1,29 +1,39 @@
-/// <reference path="../.sst/platform/config.d.ts" />
+/// <reference path="./.sst/platform/config.d.ts" />
 
 export default $config({
   app() {
     return { name: "cms-front", home: "aws" };
   },
   async run() {
-    // Estáticos (S3 + CloudFront) para tu cliente (Vite)
-    const assets = new sst.aws.StaticSite("Assets", {
-      path: "apps/renderer",
-      build: {
-        command: "pnpm build",
-        output: "dist"
-      }
+    // 1. Bucket para páginas estáticas generadas + assets
+    const bucket = new sst.aws.Bucket("CmsBucket", {
+      public: true
     });
 
-    // Lambda function para SSR
+    // 2. Lambda SSR/ISR - genera páginas y las guarda en S3
     const handler = new sst.aws.Function("RendererHandler", {
-      handler: "apps/renderer/handler.handler",
-      url: true
+      handler: "../apps/renderer/handler.handler",
+      url: true,
+      nodejs: {
+        install: ["react", "react-dom", "@aws-sdk/client-s3"],
+      },
+      environment: {
+        BUCKET_NAME: bucket.name,
+        BUCKET_URL: bucket.domain,
+      },
+      permissions: [
+        {
+          actions: ["s3:PutObject", "s3:GetObject"],
+          resources: [$interpolate`${bucket.arn}/*`]
+        }
+      ]
     });
 
     // Outputs
     return {
-      HandlerUrl: handler.url,
-      StaticUrl: assets.url,
+      LambdaUrl: handler.url,
+      BucketUrl: $interpolate`https://${bucket.domain}`,
+      BucketName: bucket.name,
     };
   },
 });
