@@ -10,18 +10,16 @@ if (!rootElement) {
   throw new Error("Root element not found");
 }
 
-// En desarrollo, usamos createRoot. En producción con SSR, usamos hydrateRoot
-if (data && data.modules) {
-  // Modo hidratación (SSR)
-  ReactDOM.hydrateRoot(
-    rootElement,
-    <ModuleRenderer modules={data.modules} />
-  );
-} else {
-  // Modo desarrollo (CSR)
-  const root = ReactDOM.createRoot(rootElement);
-  const fallbackModules = [
-    { type: "Hero", key: "hero-dev", props: { title: "Modo Desarrollo" } }
-  ];
-  root.render(<ModuleRenderer modules={fallbackModules} />);
+if (!data || !data.modules) {
+  console.error("❌ No data found in window.__DATA__");
+  console.error("Make sure you're running the dev server with SSR:");
+  console.error("  pnpm dev (uses dev-server.ts with SSR)");
+  console.error("  NOT: pnpm dev:vite (pure client-side)");
+  throw new Error("Missing SSR data. Use 'pnpm dev' instead of 'pnpm dev:vite'");
 }
+
+// Modo hidratación (SSR)
+ReactDOM.hydrateRoot(
+  rootElement,
+  <ModuleRenderer modules={data.modules} />
+);

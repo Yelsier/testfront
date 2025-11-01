@@ -1,67 +1,36 @@
-import React from "react";
-import { renderToReadableStream } from "react-dom/server";
+import { renderToString } from "react-dom/server";
 import { ModuleRenderer } from "../../packages/runtime";
 import "./registry"; // registra módulos
+import type { ResolveResponse } from "./mocks/types";
+import { getMockPage } from "./mocks/data";
 
-type ResolveResponse = {
-  renderMode: "static" | "dynamic" | "revalidate";
-  ttl?: number;
-  modules: { type: string; key: string; props: any }[];
-  seo?: { title?: string; description?: string };
-};
-
-// 🔧 Función para consultar tu API CMS
-// Cambia esta URL cuando tengas la API real
-const CMS_API_URL = process.env.CMS_API_URL || "http://localhost:4000/api";
+// 🔧 Configuración del CMS API
+const CMS_API_URL = process.env.CMS_API_URL;
+const USE_MOCK = process.env.USE_MOCK !== "false"; // Por defecto usa mocks
 
 async function resolve(path: string): Promise<ResolveResponse> {
-  // TODO: Cuando tengas la API real, descomentar esto:
-  /*
-  try {
-    const response = await fetch(`${CMS_API_URL}/pages${path}`, {
-      headers: { "Content-Type": "application/json" }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`CMS API error: ${response.status}`);
+  // Si tenemos API real y no queremos mocks
+  if (CMS_API_URL && !USE_MOCK) {
+    try {
+      const response = await fetch(`${CMS_API_URL}/pages${path}`, {
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!response.ok) {
+        throw new Error(`CMS API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("CMS API error:", error);
+      console.warn("Falling back to mock data");
+      return getMockPage(path);
     }
-    
-    return await response.json();
-  } catch (error) {
-    console.error("CMS API error:", error);
-    // Fallback a página 404 o error
-    return {
-      renderMode: "dynamic",
-      modules: [{ type: "Hero", key: "error-1", props: { title: "Página no encontrada" } }]
-    };
-  }
-  */
-
-  // 🧪 MOCK temporal - eliminar cuando tengas la API
-  if (path === "/" || path === "/home") {
-    return {
-      renderMode: "static",
-      ttl: 86400,
-      modules: [{ type: "Hero", key: "hero-1", props: { title: "Hola CMS (Estática)" } }],
-      seo: { title: "Home - CMS", description: "Página principal" }
-    };
   }
 
-  if (path === "/about") {
-    return {
-      renderMode: "static",
-      ttl: 3600,
-      modules: [{ type: "Hero", key: "hero-about", props: { title: "Sobre Nosotros (Estática)" } }],
-      seo: { title: "About - CMS" }
-    };
-  }
-
-  // Páginas dinámicas (ejemplo: /blog/post-123)
-  return {
-    renderMode: "dynamic",
-    modules: [{ type: "Hero", key: "hero-2", props: { title: `Ruta dinámica: ${path}` } }],
-    seo: { title: `${path} - CMS` }
-  };
+  // 🧪 Usar mocks (desarrollo)
+  console.log(`📝 Using mock data for: ${path}`);
+  return getMockPage(path);
 }
 
 export async function handle(event: { rawPath: string; headers: Record<string, string> }) {
@@ -71,7 +40,7 @@ export async function handle(event: { rawPath: string; headers: Record<string, s
   const bucketUrl = process.env.BUCKET_URL || "";
   const clientJsUrl = bucketUrl ? `https://${bucketUrl}/client.js` : "/client.js";
 
-  const bodyStream = await renderToReadableStream(
+  const html = renderToString(
     <html lang="es">
       <head>
         <meta charSet="utf-8" />
@@ -101,5 +70,5 @@ export async function handle(event: { rawPath: string; headers: Record<string, s
     headers["Cache-Control"] = "no-store";
   }
 
-  return new Response(bodyStream as any, { status: 200, headers });
+  return new Response(`<!DOCTYPE html>${html}`, { status: 200, headers });
 }
