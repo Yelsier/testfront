@@ -1,5 +1,5 @@
 import { handle } from "./server";
-import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
 const s3 = new S3Client({});
 const BUCKET_NAME = process.env.BUCKET_NAME!;
@@ -15,24 +15,30 @@ export const handler = async (event: any) => {
   try {
     // 1. Intentar servir desde S3 si existe
     try {
-      await s3.send(new HeadObjectCommand({
+      const s3Response = await s3.send(new GetObjectCommand({
         Bucket: BUCKET_NAME,
         Key: s3Key
       }));
 
-      // El archivo existe en S3, redirigir a él
+      // Leer el contenido del S3
+      const body = await s3Response.Body?.transformToString();
+
+      console.log(`✅ Served ${s3Key} from S3 cache`);
+
+      // Devolver el HTML desde S3 sin redirigir
       return {
-        statusCode: 302,
+        statusCode: 200,
         headers: {
-          "Location": `https://${BUCKET_URL}/${s3Key}`,
-          "Cache-Control": "public, max-age=0, must-revalidate"
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": s3Response.CacheControl || "public, max-age=3600",
+          "X-Cache": "HIT" // Para debugging
         },
-        body: ""
+        body
       };
     } catch (error: any) {
       // Archivo no existe, continuar con SSR
-      if (error.name !== "NotFound") {
-        console.warn("S3 check error:", error);
+      if (error.name !== "NoSuchKey") {
+        console.warn("S3 read error:", error);
       }
     }
 
@@ -69,7 +75,10 @@ export const handler = async (event: any) => {
     // 4. Devolver respuesta
     return {
       statusCode: res.status,
-      headers: responseHeaders,
+      headers: {
+        ...responseHeaders,
+        "X-Cache": "MISS" // Para debugging
+      },
       body
     };
   } catch (error) {

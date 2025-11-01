@@ -29,9 +29,17 @@ export default $config({
       ]
     });
 
+    // 3. CloudFront para distribución global con caching edge
+    const cdn = new sst.aws.Router("CdnRouter", {
+      routes: {
+        "/*": handler.url
+      }
+    });
+
     // Outputs
     return {
-      LambdaUrl: handler.url,
+      CdnUrl: cdn.url, // ← Usa esta URL (CloudFront delante de Lambda)
+      LambdaUrl: handler.url, // Direct access (para debugging)
       BucketUrl: $interpolate`https://${bucket.domain}`,
       BucketName: bucket.name,
     };
