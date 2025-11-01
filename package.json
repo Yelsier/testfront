@@ -11,8 +11,7 @@
         "sst:console": "cd infra && sst dev",
         "upload-assets": "bash scripts/upload-assets.sh",
         "list-resources": "bash scripts/list-resources.sh",
-        "cleanup-all": "cd infra && bash ../scripts/cleanup-all.sh",
-        "force-cleanup": "bash scripts/force-cleanup.sh"
+        "cleanup-all": "cd infra && bash ../scripts/cleanup-all.sh"
     },
     "devDependencies": {
         "@types/aws-lambda": "8.10.157",

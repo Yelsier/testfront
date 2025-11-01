@@ -2,12 +2,28 @@
 
 export default $config({
   app() {
-    return { name: "cms-front", home: "aws" };
+    return {
+      name: "cms-front",
+      home: "aws",
+      removal: "remove" // Permite eliminar recursos fácilmente
+    };
   },
   async run() {
+    // Tags globales para todos los recursos
+    const tags = {
+      Project: "cms-front",
+      Environment: $app.stage,
+      ManagedBy: "SST",
+      Stack: `cms-front-${$app.stage}`
+    };
     // 1. Bucket para páginas estáticas generadas + assets
     const bucket = new sst.aws.Bucket("CmsBucket", {
-      public: true
+      public: true,
+      transform: {
+        bucket: {
+          tags: tags
+        }
+      }
     });
 
     // 2. Lambda SSR/ISR - genera páginas y las guarda en S3
@@ -26,13 +42,26 @@ export default $config({
           actions: ["s3:PutObject", "s3:GetObject"],
           resources: [$interpolate`${bucket.arn}/*`]
         }
-      ]
+      ],
+      transform: {
+        function: {
+          tags: tags
+        },
+        role: {
+          tags: tags
+        }
+      }
     });
 
     // 3. CloudFront para distribución global con caching edge
     const cdn = new sst.aws.Router("CdnRouter", {
       routes: {
         "/*": handler.url
+      },
+      transform: {
+        cdn: {
+          tags: tags
+        }
       }
     });
 
