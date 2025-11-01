@@ -45,6 +45,7 @@ export async function handle(event: { rawPath: string; headers: Record<string, s
     <html lang="es">
       <head>
         <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{data.seo?.title ?? "CMS"}</title>
         {data.seo?.description && (
           <meta name="description" content={data.seo.description} />
