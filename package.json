@@ -7,7 +7,12 @@
         "build": "pnpm --filter renderer build",
         "dev": "pnpm --filter renderer dev",
         "sst:deploy": "cd infra && sst deploy --stage production",
-        "upload-assets": "bash scripts/upload-assets.sh"
+        "sst:remove": "cd infra && sst remove --stage production",
+        "sst:console": "cd infra && sst dev",
+        "upload-assets": "bash scripts/upload-assets.sh",
+        "list-resources": "bash scripts/list-resources.sh",
+        "cleanup-all": "cd infra && bash ../scripts/cleanup-all.sh",
+        "force-cleanup": "bash scripts/force-cleanup.sh"
     },
     "devDependencies": {
         "@types/aws-lambda": "8.10.157",

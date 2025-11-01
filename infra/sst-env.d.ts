@@ -5,19 +5,6 @@
 
 declare module "sst" {
   export interface Resource {
-    "CdnRouter": {
-      "type": "sst.aws.Router"
-      "url": string
-    }
-    "CmsBucket": {
-      "name": string
-      "type": "sst.aws.Bucket"
-    }
-    "RendererHandler": {
-      "name": string
-      "type": "sst.aws.Function"
-      "url": string
-    }
   }
 }
 /// <reference path="sst-env.d.ts" />
