@@ -14,6 +14,20 @@ export const mockPages: Record<string, ResolveResponse> = {
                 props: {
                     title: "Bienvenido al CMS (Mock)"
                 }
+            },
+            {
+                type: "Hero",
+                key: "hero-second",
+                props: {
+                    title: "Segundo Hero (Inmediato)"
+                }
+            },
+            {
+                type: "Gallery",
+                key: "gallery-1",
+                props: {
+                    title: "Mi Galería de Fotos"
+                }
             }
         ],
         seo: {

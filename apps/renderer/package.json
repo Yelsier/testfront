@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "tsx watch dev-server.ts",
+        "dev": "pnpm build && tsx watch dev-server.ts",
         "dev:vite": "vite",
         "build": "vite build",
         "preview": "vite preview"

@@ -8,34 +8,104 @@ export function register(type: string, cmp: React.ComponentType<any>) {
   registry[type] = cmp;
 }
 
+// 🎯 Configuración de lazy loading por tipo de componente
+// El FRONTEND decide qué componentes son lazy, no el backend
+const LAZY_COMPONENTS = new Set([
+  "Gallery",
+  "Comments",
+  "VideoPlayer",
+  "Map",
+  "Chart",
+  // Añade aquí los componentes que quieres cargar lazy
+]);
+
+// Componente que decide automáticamente si usar Island o no
+export function SmartModule({ module, index }: { module: ModuleDef; index: number }) {
+  const C = registry[module.type];
+  if (!C) return null;
+
+  // Decidir si debe ser lazy:
+  // 1. Si está en la lista de componentes lazy
+  // 2. O si está después del índice 2 (tercer componente en adelante)
+  const shouldBeLazy = LAZY_COMPONENTS.has(module.type) || index > 2;
+
+  if (shouldBeLazy) {
+    return <Island type={module.type} props={module.props} />;
+  }
+
+  return <C key={module.key} {...module.props} />;
+}
+
 export function ModuleRenderer({ modules }: { modules: ModuleDef[] }) {
   return (
     <Suspense fallback={null}>
-      {modules.map(m => {
-        const C = registry[m.type];
-        if (!C) return null;
-        return <C key={m.key} {...m.props} />;
-      })}
+      {modules.map((m, index) => (
+        <SmartModule key={m.key} module={m} index={index} />
+      ))}
     </Suspense>
   );
 }
 
-// “Isla” opcional (hidratación diferida)
+// "Isla" - Renderizado lazy (solo renderiza cuando es visible)
+// ✅ Siempre renderiza el HTML (para evitar hydration mismatch)
+// 🏝️ Pero deshabilita JavaScript hasta que sea visible
 export function Island({ type, props }: { type: string; props: any }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [jsActive, setJsActive] = React.useState(false);
+  const C = registry[type];
+
+  if (!C) return null;
+
   useEffect(() => {
-    const hydrate = () => {
-      const C = registry[type];
-      if (!C || !ref.current) return;
-      startTransition(() => {
-        ReactDOMClient.createRoot(ref.current!).render(<C {...props} />);
-      });
-    };
-    const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) { obs.disconnect(); (window as any).requestIdleCallback?.(hydrate) ?? hydrate(); }
-    });
-    obs.observe(ref.current!);
+    // Solo en el cliente (navegador)
+    if (typeof window === 'undefined') return;
+
+    console.log(`🏝️ Island watching: ${type}`);
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          console.log(`👁️ Island visible, activating JS: ${type}`);
+          obs.disconnect();
+
+          const activate = () => {
+            console.time(`⏱️ Activation time: ${type}`);
+            setJsActive(true);
+            console.timeEnd(`⏱️ Activation time: ${type}`);
+            console.log(`✅ Island JS active: ${type}`);
+          };
+
+          // Usar requestIdleCallback si está disponible
+          if ('requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(activate);
+          } else {
+            setTimeout(activate, 0);
+          }
+        }
+      },
+      {
+        // Empezar a cargar 200px antes de que entre en viewport
+        rootMargin: '200px'
+      }
+    );
+
+    if (ref.current) {
+      obs.observe(ref.current);
+    }
+
     return () => obs.disconnect();
-  }, []);
-  return <div ref={ref} suppressHydrationWarning />;
+  }, [type]);
+
+  // Siempre renderizar el componente (para SSR y evitar hydration errors)
+  // Solo deshabilitamos interactividad hasta que sea visible
+  const containerStyle = typeof window !== 'undefined' && !jsActive
+    ? { pointerEvents: 'none' as const, position: 'relative' as const }
+    : { position: 'relative' as const };
+
+  return (
+    <div ref={ref} style={containerStyle}>
+      {/* Siempre renderizar el componente */}
+      <C {...props} />
+    </div>
+  );
 }
