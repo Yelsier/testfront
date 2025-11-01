@@ -13,14 +13,14 @@ export const handler = async (event: any) => {
   if (path.match(/\.(js|css|json|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/)) {
     try {
       const s3Key = path.replace(/^\//, ""); // Quitar / inicial
-      
+
       const s3Response = await s3.send(new GetObjectCommand({
         Bucket: BUCKET_NAME,
         Key: s3Key
       }));
 
       const body = await s3Response.Body?.transformToByteArray();
-      
+
       // Determinar Content-Type
       const ext = path.split(".").pop();
       const contentTypes: Record<string, string> = {
