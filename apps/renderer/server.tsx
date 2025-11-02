@@ -45,6 +45,14 @@ export async function handle(event: { rawPath: string; headers: Record<string, s
         )}
         {/* Preload client.js para descarga paralela */}
         <link rel="modulepreload" href={clientJsUrl} />
+        {/* Preload chunks de módulos específicos de esta página */}
+        {data.modules.map(module => (
+          <link
+            key={module.type}
+            rel="modulepreload"
+            href={`/chunks/${module.type}.js`}
+          />
+        ))}
       </head>
       <body>
         <div id="root">
