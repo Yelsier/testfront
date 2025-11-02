@@ -36,7 +36,6 @@ export default $config({
       environment: {
         BUCKET_NAME: bucket.name,
         BUCKET_URL: bucket.domain,
-        // CDN_URL se añadirá después
       },
       permissions: [
         {

@@ -1,6 +1,6 @@
 import { ModuleRenderer } from "../../packages/runtime";
-import "./registry";
 import * as ReactDOM from "react-dom/client";
+import { loadModule } from "./registry";
 
 const data = (window as any).__DATA__;
 
@@ -21,5 +21,5 @@ if (!data || !data.modules) {
 // Modo hidratación (SSR)
 ReactDOM.hydrateRoot(
   rootElement,
-  <ModuleRenderer modules={data.modules} />
+  <ModuleRenderer modules={data.modules} loadModule={loadModule} />
 );

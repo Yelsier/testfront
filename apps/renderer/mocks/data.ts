@@ -88,14 +88,12 @@ export const mockNotFound: ResolveResponse = {
     }
 };
 
-// Simular rutas dinámicas (ej: /blog/post-123)
 export function getMockPage(path: string): ResolveResponse {
-    // Buscar en páginas estáticas
     if (mockPages[path]) {
         return mockPages[path];
     }
 
-    // Simular páginas dinámicas (blog, productos, etc)
+    // Simular páginas dinámicas (blog)
     if (path.startsWith("/blog/")) {
         const slug = path.replace("/blog/", "");
         return {
@@ -115,6 +113,5 @@ export function getMockPage(path: string): ResolveResponse {
         };
     }
 
-    // Página no encontrada
     return mockNotFound;
 }

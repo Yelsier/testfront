@@ -1,12 +1,8 @@
+import { loadModuleType } from "apps/renderer/registry";
 import React, { Suspense, useEffect, useRef, startTransition } from "react";
 import * as ReactDOMClient from "react-dom/client";
 
-type ModuleDef = { type: string; key: string; props: any };
-const registry: Record<string, React.ComponentType<any>> = {};
-
-export function register(type: string, cmp: React.ComponentType<any>) {
-  registry[type] = cmp;
-}
+export type ModuleDef = { type: string; key: string; props: any };
 
 // 🎯 Configuración de lazy loading por tipo de componente
 // El FRONTEND decide qué componentes son lazy, no el backend
@@ -20,9 +16,9 @@ const LAZY_COMPONENTS = new Set([
 ]);
 
 // Componente que decide automáticamente si usar Island o no
-export function SmartModule({ module, index }: { module: ModuleDef; index: number }) {
-  const C = registry[module.type];
-  if (!C) return null;
+export function SmartModule({ module, index, loadModule }: { module: ModuleDef; index: number; loadModule: loadModuleType }) {
+  // Memoizar el componente para evitar recrearlo en cada render
+  const C = React.useMemo(() => loadModule(module.type), [module.type, loadModule]);
 
   // Decidir si debe ser lazy:
   // 1. Si está en la lista de componentes lazy
@@ -30,17 +26,17 @@ export function SmartModule({ module, index }: { module: ModuleDef; index: numbe
   const shouldBeLazy = LAZY_COMPONENTS.has(module.type) || index > 2;
 
   if (shouldBeLazy) {
-    return <Island type={module.type} props={module.props} />;
+    return <Island type={module.type} props={module.props} loadModule={loadModule} />;
   }
 
   return <C key={module.key} {...module.props} />;
 }
 
-export function ModuleRenderer({ modules }: { modules: ModuleDef[] }) {
+export function ModuleRenderer({ modules, loadModule }: { modules: ModuleDef[], loadModule: loadModuleType }) {
   return (
     <Suspense fallback={null}>
       {modules.map((m, index) => (
-        <SmartModule key={m.key} module={m} index={index} />
+        <SmartModule key={m.key} module={m} index={index} loadModule={loadModule} />
       ))}
     </Suspense>
   );
@@ -49,12 +45,12 @@ export function ModuleRenderer({ modules }: { modules: ModuleDef[] }) {
 // "Isla" - Renderizado lazy (solo renderiza cuando es visible)
 // ✅ Siempre renderiza el HTML (para evitar hydration mismatch)
 // 🏝️ Pero deshabilita JavaScript hasta que sea visible
-export function Island({ type, props }: { type: string; props: any }) {
+export function Island({ type, props, loadModule }: { type: string; props: any; loadModule: loadModuleType }) {
   const ref = useRef<HTMLDivElement>(null);
   const [jsActive, setJsActive] = React.useState(false);
-  const C = registry[type];
 
-  if (!C) return null;
+  // Memoizar el componente para evitar recrearlo en cada render
+  const C = React.useMemo(() => loadModule(type), [type, loadModule]);
 
   useEffect(() => {
     // Solo en el cliente (navegador)

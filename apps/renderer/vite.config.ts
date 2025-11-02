@@ -10,14 +10,11 @@ export default defineConfig({
     outDir: "dist",
     rollupOptions: {
       input: {
-        // Para SSR: solo el cliente
         client: path.resolve(__dirname, "entry.client.tsx"),
-        // Para SPA (opcional): también el HTML
-        // main: path.resolve(__dirname, "index.html")
       },
       output: {
         entryFileNames: "client.js",
-        chunkFileNames: "chunks/[name]-[hash].js",
+        chunkFileNames: "chunks/[name].js",
         assetFileNames: "assets/[name]-[hash].[ext]"
       }
     }

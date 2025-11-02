@@ -1,8 +1,8 @@
 import { renderToString } from "react-dom/server";
 import { ModuleRenderer } from "../../packages/runtime";
-import "./registry"; // registra módulos
 import type { ResolveResponse } from "./mocks/types";
 import { getMockPage } from "./mocks/data";
+import { loadModule } from "./registry";
 
 // 🔧 Configuración del CMS API
 const CMS_API_URL = process.env.CMS_API_URL;
@@ -12,15 +12,8 @@ async function resolve(path: string): Promise<ResolveResponse> {
   // Si tenemos API real y no queremos mocks
   if (CMS_API_URL && !USE_MOCK) {
     try {
-      const response = await fetch(`${CMS_API_URL}/pages${path}`, {
-        headers: { "Content-Type": "application/json" }
-      });
+      throw new Error(`CMS API error: Api not implemented yet`);
 
-      if (!response.ok) {
-        throw new Error(`CMS API error: ${response.status}`);
-      }
-
-      return await response.json();
     } catch (error) {
       console.error("CMS API error:", error);
       console.warn("Falling back to mock data");
@@ -55,7 +48,7 @@ export async function handle(event: { rawPath: string; headers: Record<string, s
       </head>
       <body>
         <div id="root">
-          <ModuleRenderer modules={data.modules} />
+          <ModuleRenderer modules={data.modules} loadModule={loadModule} />
         </div>
         <script dangerouslySetInnerHTML={{ __html: `window.__DATA__=${JSON.stringify(data)};` }} />
         <script type="module" src={clientJsUrl}></script>
