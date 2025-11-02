@@ -33,11 +33,19 @@ export function SmartModule({ module, index, loadModule }: { module: ModuleDef; 
 }
 
 export function ModuleRenderer({ modules, loadModule }: { modules: ModuleDef[], loadModule: loadModuleType }) {
+  const content = modules.map((m, index) => (
+    <SmartModule key={m.key} module={m} index={index} loadModule={loadModule} />
+  ));
+
+  // En servidor: sin Suspense (componentes síncronos cargados con require)
+  if (typeof window === 'undefined') {
+    return <>{content}</>;
+  }
+
+  // En cliente: con Suspense (componentes lazy para chunks)
   return (
-    <Suspense fallback={null}>
-      {modules.map((m, index) => (
-        <SmartModule key={m.key} module={m} index={index} loadModule={loadModule} />
-      ))}
+    <Suspense fallback={<div>Loading modules...</div>}>
+      {content}
     </Suspense>
   );
 }

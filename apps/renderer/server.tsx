@@ -2,7 +2,7 @@ import { renderToString } from "react-dom/server";
 import { ModuleRenderer } from "../../packages/runtime";
 import type { ResolveResponse } from "./mocks/types";
 import { getMockPage } from "./mocks/data";
-import { loadModule } from "./registry";
+import { loadModule, preloadSSRModule } from "./registry";
 
 // 🔧 Configuración del CMS API
 const CMS_API_URL = process.env.CMS_API_URL;
@@ -29,6 +29,10 @@ async function resolve(path: string): Promise<ResolveResponse> {
 export async function handle(event: { rawPath: string; headers: Record<string, string> }) {
   const data = await resolve(event.rawPath || "/");
 
+  // Pre-cargar todos los módulos necesarios para esta página
+  const moduleTypes = [...new Set(data.modules.map(m => m.type))];
+  await Promise.all(moduleTypes.map(type => preloadSSRModule(type)));
+
   // Usar ruta relativa - CloudFront se encarga del routing
   // En producción: CloudFront sirve /client.js desde S3
   // En desarrollo local: se sirve desde dist/
@@ -45,8 +49,8 @@ export async function handle(event: { rawPath: string; headers: Record<string, s
         )}
         {/* Preload client.js para descarga paralela */}
         <link rel="modulepreload" href={clientJsUrl} />
-        {/* Preload chunks de módulos específicos de esta página */}
-        {data.modules.map(module => (
+        {/* Preload chunks de módulos específicos de esta página - solo en producción */}
+        {process.env.NODE_ENV === 'production' && data.modules.map(module => (
           <link
             key={module.type}
             rel="modulepreload"
@@ -56,7 +60,7 @@ export async function handle(event: { rawPath: string; headers: Record<string, s
       </head>
       <body>
         <div id="root">
-          {/* SSR solo el contenedor, el cliente renderizará los módulos */}
+          <ModuleRenderer modules={data.modules} loadModule={loadModule} />
         </div>
         <script dangerouslySetInnerHTML={{ __html: `window.__DATA__=${JSON.stringify(data)};` }} />
         <script type="module" src={clientJsUrl}></script>

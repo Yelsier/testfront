@@ -18,7 +18,8 @@ if (!data || !data.modules) {
   throw new Error("Missing SSR data. Use 'pnpm dev' instead of 'pnpm dev:vite'");
 }
 
-// Sin SSR, usar createRoot
+// Usar createRoot para evitar problemas de hidratación
+// El servidor envía placeholders, el cliente renderiza el contenido real
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <ModuleRenderer modules={data.modules} loadModule={loadModule} />
