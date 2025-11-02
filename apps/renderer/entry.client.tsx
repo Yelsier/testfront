@@ -18,8 +18,8 @@ if (!data || !data.modules) {
   throw new Error("Missing SSR data. Use 'pnpm dev' instead of 'pnpm dev:vite'");
 }
 
-// Modo hidratación (SSR)
-ReactDOM.hydrateRoot(
-  rootElement,
+// Sin SSR, usar createRoot
+const root = ReactDOM.createRoot(rootElement);
+root.render(
   <ModuleRenderer modules={data.modules} loadModule={loadModule} />
 );

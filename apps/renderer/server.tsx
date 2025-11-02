@@ -48,7 +48,7 @@ export async function handle(event: { rawPath: string; headers: Record<string, s
       </head>
       <body>
         <div id="root">
-          <ModuleRenderer modules={data.modules} loadModule={loadModule} />
+          {/* SSR solo el contenedor, el cliente renderizará los módulos */}
         </div>
         <script dangerouslySetInnerHTML={{ __html: `window.__DATA__=${JSON.stringify(data)};` }} />
         <script type="module" src={clientJsUrl}></script>

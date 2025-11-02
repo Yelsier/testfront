@@ -4,8 +4,6 @@ import { lazy } from "react";
 const moduleCache = new Map<string, React.LazyExoticComponent<any>>();
 
 export const loadModule = (type: string) => {
-    console.log("Loading module", type);
-
     // Si ya está en cache, devolverlo
     if (moduleCache.has(type)) {
         return moduleCache.get(type)!;
@@ -13,6 +11,8 @@ export const loadModule = (type: string) => {
 
     // Crear el componente lazy y guardarlo en cache
     const lazyComponent = lazy(() => import(`./modules/${type}.tsx`));
+    console.log("⏳ Importing module:", type);
+
     moduleCache.set(type, lazyComponent);
 
     return lazyComponent;
