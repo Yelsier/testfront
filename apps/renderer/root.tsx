@@ -24,31 +24,30 @@ async function resolve(path: string): Promise<ResolveResponse> {
     return getMockPage(path);
 }
 
-export function Root(props: { url: URL }) {
-    return (
-        <html lang="en">
-            <head>
-                <meta charSet="UTF-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <title>Vite + RSC</title>
-            </head>
-            <body>
-                <App {...props} />
-            </body>
-        </html>
-    )
-}
-
-async function App(props: { url: URL }) {
-
+export async function Root(props: { url: URL }) {
+    // ✅ Resolver datos ANTES de crear el árbol de componentes
     const data = await resolve(props.url.pathname);
 
     const moduleTypes = [...new Set(data.modules.map(m => m.type))];
     await Promise.all(moduleTypes.map(type => preloadSSRModule(type)));
 
+    const clientJsUrl = "/client/index.js";
+
     return (
-        <div id="root">
-            <ModuleRenderer modules={data.modules} loadModule={loadModule} />
-        </div>
+        <html lang="en">
+            <head>
+                <meta charSet="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <title>{data.seo?.title ?? "CMS"}</title>
+                {data.seo?.description && (
+                    <meta name="description" content={data.seo.description} />
+                )}
+            </head>
+            <body>
+                <div id="root">
+                    <ModuleRenderer modules={data.modules} loadModule={loadModule} />
+                </div>
+            </body>
+        </html>
     )
 }

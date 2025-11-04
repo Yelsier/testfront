@@ -28,11 +28,12 @@ async function resolve(path: string): Promise<ResolveResponse> {
 export async function handle(event: { rawPath: string; headers: Record<string, string> }) {
   const data = await resolve(event.rawPath || "/");
 
-  const html = renderToString(
-    Root({
-      url: new URL(`http://localhost${event.rawPath}`),
-    })
-  );
+  // ✅ Awaitar Root porque ahora es async
+  const rootElement = await Root({
+    url: new URL(`http://localhost${event.rawPath}`)
+  });
+
+  const html = renderToString(rootElement);
 
   const headers: Record<string, string> = {
     "Content-Type": "text/html; charset=utf-8"

@@ -19,7 +19,7 @@ export default defineConfig({
             index: './entry.rsc.tsx',
           },
           output: {
-            entryFileNames: "client.js",
+            entryFileNames: "index.js",
             chunkFileNames: "chunks/[name].js",
             assetFileNames: "assets/[name]-[hash].[ext]"
           }
@@ -38,7 +38,7 @@ export default defineConfig({
             index: './entry.ssr.tsx',
           },
           output: {
-            entryFileNames: "client.js",
+            entryFileNames: "index.js",
             chunkFileNames: "chunks/[name].js",
             assetFileNames: "assets/[name]-[hash].[ext]"
           }
@@ -59,7 +59,7 @@ export default defineConfig({
             index: './entry.browser.tsx',
           },
           output: {
-            entryFileNames: "client.js",
+            entryFileNames: "index.js",
             chunkFileNames: "chunks/[name].js",
             assetFileNames: "assets/[name]-[hash].[ext]"
           }

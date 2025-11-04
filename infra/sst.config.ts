@@ -39,8 +39,8 @@ export default $config({
       },
       permissions: [
         {
-          actions: ["s3:PutObject", "s3:GetObject"],
-          resources: [$interpolate`${bucket.arn}/*`]
+          actions: ["s3:PutObject", "s3:GetObject", "s3:ListBucket"],
+          resources: [bucket.arn, $interpolate`${bucket.arn}/*`]
         }
       ],
       transform: {
