@@ -16,8 +16,8 @@
     "devDependencies": {
         "@types/aws-lambda": "8.10.157",
         "@types/node": "^22.9.0",
-        "@types/react": "^18.3.12",
-        "@types/react-dom": "^18.3.1",
+        "@types/react": "^19.2.0",
+        "@types/react-dom": "^19.2.0",
         "typescript": "^5.6.3"
     },
     "dependencies": {
