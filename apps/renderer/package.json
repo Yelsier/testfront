@@ -4,8 +4,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "pnpm build && tsx watch dev-server.ts",
-        "dev:vite": "vite",
+        "dev": "vite",
         "build": "vite build",
         "preview": "vite preview"
     },
@@ -14,12 +13,14 @@
         "express": "^4.21.1",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
+        "rsc-html-stream": "^0.0.7",
         "runtime": "workspace:*"
     },
     "devDependencies": {
         "@types/express": "^5.0.0",
         "@vitejs/plugin-react": "^4.3.3",
+        "@vitejs/plugin-rsc": "^0.5.1",
         "tsx": "^4.19.2",
-        "vite": "^5.4.10"
+        "vite": "^7.1.12"
     }
 }

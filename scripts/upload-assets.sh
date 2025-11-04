@@ -16,52 +16,59 @@ echo "📦 Building assets..."
 cd "$(dirname "$0")/../apps/renderer"
 pnpm build
 
-# Subir client.js al bucket con compresión gzip
-echo "⬆️  Uploading client.js to S3..."
-if [ -f "dist/client.js" ]; then
-  # Comprimir con gzip
-  echo "🗜️  Compressing with gzip..."
-  gzip -9 -c dist/client.js > dist/client.js.gz
-  
-  # Subir versión comprimida con headers correctos
-  aws s3 cp dist/client.js.gz "s3://${BUCKET_NAME}/client.js" \
-    --content-type "application/javascript" \
-    --content-encoding "gzip" \
-    --cache-control "public, max-age=31536000, immutable"
-  
-  echo "✅ client.js uploaded (gzipped: $(du -h dist/client.js.gz | cut -f1))"
-  
-  # Limpiar temporal
-  rm dist/client.js.gz
-else
-  echo "❌ Error: dist/client.js not found"
-  echo "Available files:"
-  ls -la dist/
+# Verificar que existe el directorio dist
+if [ ! -d "dist" ]; then
+  echo "❌ Error: dist/ directory not found"
   exit 1
 fi
 
-# Subir chunks y assets opcionales
-if [ -d "dist/chunks" ]; then
-  echo "⬆️  Uploading chunks..."
-  # Comprimir y subir cada chunk
-  for file in dist/chunks/*.js; do
-    if [ -f "$file" ]; then
-      filename=$(basename "$file")
-      gzip -9 -c "$file" > "$file.gz"
-      aws s3 cp "$file.gz" "s3://${BUCKET_NAME}/chunks/$filename" \
-        --content-type "application/javascript" \
-        --content-encoding "gzip" \
-        --cache-control "public, max-age=31536000, immutable"
-      rm "$file.gz"
-    fi
-  done
-  echo "✅ Chunks uploaded (gzipped)"
-fi
+echo "📂 Contents of dist/:"
+ls -lah dist/
 
-if [ -d "dist/assets" ]; then
-  echo "⬆️  Uploading assets..."
-  aws s3 sync dist/assets/ "s3://${BUCKET_NAME}/assets/" \
+# Comprimir todos los archivos .js y .mjs con gzip
+echo "🗜️  Compressing JavaScript files..."
+find dist -type f \( -name "*.js" -o -name "*.mjs" \) | while read -r file; do
+  gzip -9 -c "$file" > "$file.gz"
+  echo "  Compressed: $file"
+done
+
+# Subir todo el directorio dist/ al bucket con las configuraciones apropiadas
+echo "⬆️  Uploading all files from dist/ to S3..."
+
+# Subir archivos JS/MJS comprimidos con content-encoding gzip
+find dist -type f -name "*.gz" | while read -r gzfile; do
+  # Obtener ruta relativa sin el .gz
+  originalfile="${gzfile%.gz}"
+  relativepath="${originalfile#dist/}"
+  
+  # Determinar content-type
+  if [[ "$originalfile" == *.css ]]; then
+    contenttype="text/css"
+  elif [[ "$originalfile" == *.js ]] || [[ "$originalfile" == *.mjs ]]; then
+    contenttype="application/javascript"
+  elif [[ "$originalfile" == *.json ]]; then
+    contenttype="application/json"
+  else
+    contenttype="application/octet-stream"
+  fi
+  
+  aws s3 cp "$gzfile" "s3://${BUCKET_NAME}/${relativepath}" \
+    --content-type "$contenttype" \
+    --content-encoding "gzip" \
     --cache-control "public, max-age=31536000, immutable"
-fi
+  
+  echo "  ✅ Uploaded: ${relativepath} (gzipped)"
+  rm "$gzfile"
+done
 
-echo "✅ Assets uploaded successfully!"
+# Subir archivos restantes (imágenes, fuentes, etc.) sin compresión
+echo "⬆️  Uploading remaining files..."
+aws s3 sync dist/ "s3://${BUCKET_NAME}/" \
+  --exclude "*.js" \
+  --exclude "*.mjs" \
+  --exclude "*.gz" \
+  --cache-control "public, max-age=31536000, immutable"
+
+echo "✅ All assets uploaded successfully!"
+echo "📊 Bucket contents:"
+aws s3 ls "s3://${BUCKET_NAME}/" --recursive --human-readable

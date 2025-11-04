@@ -31,7 +31,7 @@ export default $config({
       handler: "../apps/renderer/handler.handler",
       url: true,
       nodejs: {
-        install: ["react", "react-dom", "@aws-sdk/client-s3"],
+        install: ["react", "react-dom", "@aws-sdk/client-s3", "vite"],
       },
       environment: {
         BUCKET_NAME: bucket.name,

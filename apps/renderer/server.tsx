@@ -1,8 +1,7 @@
 import { renderToString } from "react-dom/server";
-import { ModuleRenderer } from "../../packages/runtime";
 import type { ResolveResponse } from "./mocks/types";
 import { getMockPage } from "./mocks/data";
-import { loadModule, preloadSSRModule } from "./registry";
+import { Root } from "./root";
 
 // 🔧 Configuración del CMS API
 const CMS_API_URL = process.env.CMS_API_URL;
@@ -29,43 +28,10 @@ async function resolve(path: string): Promise<ResolveResponse> {
 export async function handle(event: { rawPath: string; headers: Record<string, string> }) {
   const data = await resolve(event.rawPath || "/");
 
-  // Pre-cargar todos los módulos necesarios para esta página
-  const moduleTypes = [...new Set(data.modules.map(m => m.type))];
-  await Promise.all(moduleTypes.map(type => preloadSSRModule(type)));
-
-  // Usar ruta relativa - CloudFront se encarga del routing
-  // En producción: CloudFront sirve /client.js desde S3
-  // En desarrollo local: se sirve desde dist/
-  const clientJsUrl = "/client.js";
-
   const html = renderToString(
-    <html lang="es">
-      <head>
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>{data.seo?.title ?? "CMS"}</title>
-        {data.seo?.description && (
-          <meta name="description" content={data.seo.description} />
-        )}
-        {/* Preload client.js para descarga paralela */}
-        <link rel="modulepreload" href={clientJsUrl} />
-        {/* Preload chunks de módulos específicos de esta página - solo en producción */}
-        {process.env.NODE_ENV === 'production' && data.modules.map(module => (
-          <link
-            key={module.type}
-            rel="modulepreload"
-            href={`/chunks/${module.type}.js`}
-          />
-        ))}
-      </head>
-      <body>
-        <div id="root">
-          <ModuleRenderer modules={data.modules} loadModule={loadModule} />
-        </div>
-        <script dangerouslySetInnerHTML={{ __html: `window.__DATA__=${JSON.stringify(data)};` }} />
-        <script type="module" src={clientJsUrl}></script>
-      </body>
-    </html>
+    Root({
+      url: new URL(`http://localhost${event.rawPath}`),
+    })
   );
 
   const headers: Record<string, string> = {

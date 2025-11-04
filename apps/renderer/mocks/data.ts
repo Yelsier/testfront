@@ -19,7 +19,7 @@ export const mockPages: Record<string, ResolveResponse> = {
                 type: "Hero",
                 key: "hero-second",
                 props: {
-                    title: "Segundo Hero (Inmediato)"
+                    title: "Segundo Hero (Mock)"
                 }
             },
             {
