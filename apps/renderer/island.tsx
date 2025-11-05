@@ -1,21 +1,19 @@
 "use client"
 
 import React, { useRef, useEffect } from "react";
-import { loadModuleType } from "./registry";
+import { loadModuleType, ModuleType } from "./registry";
 
 // "Isla" - Renderizado lazy (solo renderiza cuando es visible)
 // ✅ Siempre renderiza el HTML (para evitar hydration mismatch)
 // 🏝️ Pero deshabilita JavaScript hasta que sea visible
-export function Island({ type, props, loadModule }: { type: string; props: any; loadModule: loadModuleType }) {
+export function Island({ type, children, props }: { type: string; children: React.ReactNode; props: any }) {
     const ref = useRef<HTMLDivElement>(null);
     const [jsActive, setJsActive] = React.useState(false);
-
-    // Memoizar el componente para evitar recrearlo en cada render
-    const C = React.useMemo(() => loadModule(type), [type, loadModule]);
+    const [mounted, setMounted] = React.useState(false);
 
     useEffect(() => {
-        // Solo en el cliente (navegador)
-        if (typeof window === 'undefined') return;
+        // Marcar como mounted para evitar hydration mismatch
+        setMounted(true);
 
         console.log(`🏝️ Island watching: ${type}`);
 
@@ -55,14 +53,19 @@ export function Island({ type, props, loadModule }: { type: string; props: any; 
 
     // Siempre renderizar el componente (para SSR y evitar hydration errors)
     // Solo deshabilitamos interactividad hasta que sea visible
-    const containerStyle = typeof window !== 'undefined' && !jsActive
-        ? { pointerEvents: 'none' as const, position: 'relative' as const }
-        : { position: 'relative' as const };
+    // ⚠️ Solo aplicar estilos después de montar en el cliente
+    const shouldDisableInteraction = mounted && !jsActive;
 
     return (
-        <div ref={ref} style={containerStyle}>
+        <div
+            ref={ref}
+            style={{
+                position: 'relative' as const,
+                pointerEvents: shouldDisableInteraction ? 'none' : 'auto'
+            }}
+        >
             {/* Siempre renderizar el componente */}
-            <C {...props} />
+            {children}
         </div>
     );
 }

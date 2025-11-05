@@ -23,7 +23,7 @@ export async function preloadSSRModule(type: string): Promise<void> {
     }
 }
 
-export const loadModule = (type: string) => {
+export const loadModule = (type: string): React.ComponentType<any> => {
     // En servidor: usar componentes pre-cargados del cache SSR
     if (typeof window === 'undefined') {
         const Component = ssrCache.get(type);
@@ -47,3 +47,4 @@ export const loadModule = (type: string) => {
 };
 
 export type loadModuleType = typeof loadModule;
+export type ModuleType = ReturnType<loadModuleType>;

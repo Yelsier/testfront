@@ -19,34 +19,26 @@ const LAZY_COMPONENTS = new Set([
 // Componente que decide automáticamente si usar Island o no
 export function SmartModule({ module, index, loadModule }: { module: ModuleDef; index: number; loadModule: loadModuleType }) {
   // Memoizar el componente para evitar recrearlo en cada render
-  const C = React.useMemo(() => loadModule(module.type), [module.type, loadModule]);
+  const C = loadModule(module.type)
 
   // Decidir si debe ser lazy:
   // 1. Si está en la lista de componentes lazy
   // 2. O si está después del índice 2 (tercer componente en adelante)
   const shouldBeLazy = LAZY_COMPONENTS.has(module.type) || index > 2;
 
-  /* if (shouldBeLazy) {
-    return <Island type={module.type} props={module.props} loadModule={loadModule} />;
-  } */
+  if (shouldBeLazy) {
+    return <Island type={module.type} props={module.props} >
+      <C key={module.key} {...module.props} />
+    </Island>
+  }
 
   return <C key={module.key} {...module.props} />;
 }
 
 export function ModuleRenderer({ modules, loadModule }: { modules: ModuleDef[], loadModule: loadModuleType }) {
-  const content = modules.map((m, index) => (
-    <SmartModule key={m.key} module={m} index={index} loadModule={loadModule} />
-  ));
-
-  // En servidor: sin Suspense (componentes síncronos cargados con require)
-  if (typeof window === 'undefined') {
-    return <>{content}</>;
-  }
-
-  // En cliente: con Suspense (componentes lazy para chunks)
-  return (
-    <Suspense fallback={<div>Loading modules...</div>}>
-      {content}
+  return modules.map((m, index) => (
+    <Suspense fallback={<div>Loading {m.type}...</div>} key={m.key}>
+      <SmartModule module={m} index={index} loadModule={loadModule} />
     </Suspense>
-  );
+  ));
 }

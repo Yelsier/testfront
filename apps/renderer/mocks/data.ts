@@ -16,6 +16,16 @@ export const mockPages: Record<string, ResolveResponse> = {
                 }
             },
             {
+                type: "JsonTest",
+                key: "json-test-1",
+                props: {}
+            },
+            {
+                type: "HeavyServer",
+                key: "heavy-server-1",
+                props: {}
+            },
+            {
                 type: "Hero",
                 key: "hero-second",
                 props: {

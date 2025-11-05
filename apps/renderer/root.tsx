@@ -31,8 +31,6 @@ export async function Root(props: { url: URL }) {
     const moduleTypes = [...new Set(data.modules.map(m => m.type))];
     await Promise.all(moduleTypes.map(type => preloadSSRModule(type)));
 
-    const clientJsUrl = "/client/index.js";
-
     return (
         <html lang="en">
             <head>
