@@ -48,9 +48,6 @@ importers:
       rsc-html-stream:
         specifier: ^0.0.7
         version: 0.0.7
-      runtime:
-        specifier: workspace:*
-        version: link:../../packages/runtime
     devDependencies:
       '@types/express':
         specifier: ^5.0.0
@@ -73,15 +70,6 @@ importers:
       sst:
         specifier: ^3.3.0
         version: 3.17.21
-
-  packages/runtime:
-    dependencies:
-      react:
-        specifier: ^19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.0(react@19.2.0)
 
 packages:
 

@@ -1,9 +1,22 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { handle } from "./server";
 
 const s3 = new S3Client({});
 const BUCKET_NAME = process.env.BUCKET_NAME!;
 const BUCKET_URL = process.env.BUCKET_URL!;
+
+// El handler RSC compilado se cargará dinámicamente
+let rscHandler: ((req: Request) => Promise<Response>) | null = null;
+
+async function getRscHandler() {
+  if (!rscHandler) {
+    // Cargar el bundle RSC compilado por Vite
+    // Este archivo debe existir después de ejecutar `pnpm build`
+    // @ts-ignore
+    const module = await import('./dist/rsc/index.js');
+    rscHandler = module.default;
+  }
+  return rscHandler!;
+}
 
 export const handler = async (event: any) => {
   const path = event.rawPath || event.requestContext?.http?.path || "/";
@@ -95,12 +108,24 @@ export const handler = async (event: any) => {
       }
     }
 
-    // 2. Generar página con SSR
-    const res = await handle({ rawPath: path, headers });
-    const body = await res.text();
+    // 2. Generar página con RSC (usando el handler RSC compilado)
+    // Construir Request object para el handler RSC
+    const url = new URL(path, `https://${headers.host || 'localhost'}`);
+    const request = new Request(url.toString(), {
+      method: event.requestContext?.http?.method || 'GET',
+      headers: headers,
+    });
+
+    // Llamar al handler RSC que internamente:
+    // 1. Genera el RSC stream (entry.rsc.tsx)
+    // 2. Lo pasa al SSR para generar HTML (entry.ssr.tsx)
+    // 3. Inyecta el RSC stream en el HTML para hidratación
+    const handler = await getRscHandler();
+    const response = await handler(request);
+    const body = await response.text();
     const responseHeaders: Record<string, string> = {};
 
-    res.headers.forEach((value, key) => {
+    response.headers.forEach((value: string, key: string) => {
       responseHeaders[key] = value;
     });
 
@@ -127,7 +152,7 @@ export const handler = async (event: any) => {
 
     // 4. Devolver respuesta
     return {
-      statusCode: res.status,
+      statusCode: response.status,
       headers: {
         ...responseHeaders,
         "X-Cache": "MISS" // Para debugging

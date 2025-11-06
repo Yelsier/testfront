@@ -7,13 +7,20 @@ export default defineConfig({
   plugins: [rsc({}), react()],
   root: path.resolve(__dirname),
   publicDir: path.resolve(__dirname, "public"),
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
+  },
   environments: {
     // `rsc` environment loads modules with `react-server` condition.
     // this environment is responsible for:
     // - RSC stream serialization (React VDOM -> RSC stream)
     // - server functions handling
     rsc: {
+      resolve: {
+        noExternal: true, // Bundle all dependencies including @vitejs/plugin-rsc
+      },
       build: {
+        minify: process.env.NODE_ENV === 'production',
         rollupOptions: {
           input: {
             index: './entry.rsc.tsx',

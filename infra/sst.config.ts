@@ -31,8 +31,21 @@ export default $config({
       handler: "../apps/renderer/handler.handler",
       url: true,
       nodejs: {
-        install: ["react", "react-dom", "@aws-sdk/client-s3", "vite"],
+        install: ["react", "react-dom", "@aws-sdk/client-s3", "@vitejs/plugin-rsc"],
+        esbuild: {
+          external: [
+            "virtual:*", // Exclude Vite virtual modules
+            "@vitejs/plugin-rsc", // Exclude the plugin package itself
+          ],
+        }
       },
+      // Copiar el directorio dist con los bundles RSC/SSR compilados
+      copyFiles: [
+        {
+          from: "../apps/renderer/dist",
+          to: "dist"
+        }
+      ],
       environment: {
         BUCKET_NAME: bucket.name,
         BUCKET_URL: bucket.domain,
