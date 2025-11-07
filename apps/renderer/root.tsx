@@ -1,5 +1,5 @@
 import { ModuleRenderer } from "./moduleloader"
-import { loadModule, preloadSSRModule } from "./registry";
+import { preloadSSRModule } from "./registry";
 import type { ResolveResponse } from "./mocks/types";
 import { getMockPage } from "./mocks/data";
 
@@ -43,7 +43,7 @@ export async function Root(props: { url: URL }) {
             </head>
             <body>
                 <div id="root">
-                    <ModuleRenderer modules={data.modules} loadModule={loadModule} />
+                    <ModuleRenderer modules={data.modules} />
                 </div>
             </body>
         </html>

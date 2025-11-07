@@ -1,6 +1,5 @@
-import { loadModuleType } from "apps/renderer/registry";
-import React, { Suspense, useEffect, useRef, startTransition } from "react";
-import * as ReactDOMClient from "react-dom/client";
+import { loadModule } from "./registry";
+import { Suspense } from "react";
 import { Island } from "./island";
 
 export type ModuleDef = { type: string; key: string; props: any };
@@ -16,10 +15,16 @@ const LAZY_COMPONENTS = new Set([
   // Añade aquí los componentes que quieres cargar lazy
 ]);
 
+export const isAsyncFunction = (fn: unknown): fn is (...a: any[]) => Promise<any> =>
+  typeof fn === "function" && fn.constructor?.name === "AsyncFunction";
+
 // Componente que decide automáticamente si usar Island o no
-export function SmartModule({ module, index, loadModule }: { module: ModuleDef; index: number; loadModule: loadModuleType }) {
+export function SmartModule({ module, index }: { module: ModuleDef; index: number; }) {
   // Memoizar el componente para evitar recrearlo en cada render
-  const C = loadModule(module.type)
+  const { component: C, fallback: F } = loadModule(module.type)
+
+  //Async function
+  const isAsync = isAsyncFunction(C);
 
   // Decidir si debe ser lazy:
   // 1. Si está en la lista de componentes lazy
@@ -32,13 +37,15 @@ export function SmartModule({ module, index, loadModule }: { module: ModuleDef; 
     </Island>
   }
 
-  return <C key={module.key} {...module.props} />;
+  return isAsync ?
+    <Suspense fallback={F ? <F /> : null}>
+      <C {...module.props} />
+    </Suspense>
+    : <C {...module.props} />;
 }
 
-export function ModuleRenderer({ modules, loadModule }: { modules: ModuleDef[], loadModule: loadModuleType }) {
+export function ModuleRenderer({ modules }: { modules: ModuleDef[] }) {
   return modules.map((m, index) => (
-    <Suspense fallback={<div>Loading {m.type}...</div>} key={m.key}>
-      <SmartModule module={m} index={index} loadModule={loadModule} />
-    </Suspense>
+    <SmartModule key={m.key} module={m} index={index} />
   ));
 }

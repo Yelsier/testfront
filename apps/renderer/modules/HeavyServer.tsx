@@ -8,3 +8,12 @@ export default async function HeavyServer() {
         </div>
     );
 }
+
+export function Fallback() {
+    return (
+        <div style={{ padding: '20px', backgroundColor: '#f9f9f9', border: '2px dashed #ccc' }}>
+            <h2>Loading Heavy Component...</h2>
+            <p>Please wait while the heavy component is being loaded.</p>
+        </div>
+    );
+}
