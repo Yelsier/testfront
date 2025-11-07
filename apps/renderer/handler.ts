@@ -1,170 +1,83 @@
+// handler.ts
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+///@ts-ignore
+import rscHandler from './dist/rsc/index.js';
+
 
 const s3 = new S3Client({});
 const BUCKET_NAME = process.env.BUCKET_NAME!;
-const BUCKET_URL = process.env.BUCKET_URL!;
-
-// El handler RSC compilado se cargará dinámicamente
-let rscHandler: ((req: Request) => Promise<Response>) | null = null;
+let rscHandler: (req: Request) => Promise<Response> | Response;
 
 async function getRscHandler() {
   if (!rscHandler) {
-    // Cargar el bundle RSC compilado por Vite
-    // Este archivo debe existir después de ejecutar `pnpm build`
-    // @ts-ignore
-    const module = await import('./dist/rsc/index.js');
-    rscHandler = module.default;
+    // IMPORTA EL BUNDLE COMPILADO POR Vite (no fuentes, no "virtual:")
+    //@ts-ignore
+    const mod = await import("./dist/rsc/index.js");
+    rscHandler = (mod.default ?? mod.handler ?? mod.render) as any;
   }
   return rscHandler!;
 }
 
-export const handler = async (event: any) => {
-  const path = event.rawPath || event.requestContext?.http?.path || "/";
-  const headers = event.headers || {};
+const getRequestFromEvent = (event: any): Request => {
+  // Convert Lambda Function URL event to Web Request
+  const { rawPath, headers = {}, requestContext, body, isBase64Encoded } = event;
+  const method = requestContext?.http?.method || 'GET';
+  const host = headers.host || headers.Host || 'localhost';
 
-  // Si es un asset estático (js, css, etc), servir desde S3 directamente
-  if (path.match(/\.(js|css|json|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/)) {
-    try {
-      const s3Key = path.replace(/^\//, ""); // Quitar / inicial
+  // Build URL
+  const queryString = event.rawQueryString || '';
+  const url = `https://${host}${rawPath}${queryString ? '?' + queryString : ''}`;
 
-      const s3Response = await s3.send(new GetObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: s3Key
-      }));
+  // Build headers
+  const requestHeaders = new Headers();
+  for (const [key, value] of Object.entries(headers)) {
+    requestHeaders.set(key, value as string);
+  }
+  requestHeaders.set("accept", "text/html");
 
-      const body = await s3Response.Body?.transformToByteArray();
-
-      // Determinar Content-Type
-      const ext = path.split(".").pop();
-      const contentTypes: Record<string, string> = {
-        "js": "application/javascript",
-        "css": "text/css",
-        "json": "application/json",
-        "png": "image/png",
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "gif": "image/gif",
-        "svg": "image/svg+xml",
-        "ico": "image/x-icon",
-        "woff": "font/woff",
-        "woff2": "font/woff2",
-        "ttf": "font/ttf",
-        "eot": "application/vnd.ms-fontobject"
-      };
-
-      return {
-        statusCode: 200,
-        headers: {
-          "Content-Type": contentTypes[ext || ""] || "application/octet-stream",
-          "Cache-Control": "public, max-age=31536000, immutable",
-          "Content-Encoding": s3Response.ContentEncoding || undefined,
-          "X-Served-From": "S3"
-        },
-        body: Buffer.from(body || []).toString("base64"),
-        isBase64Encoded: true
-      };
-    } catch (error: any) {
-      if (error.name === "NoSuchKey") {
-        return {
-          statusCode: 404,
-          headers: { "Content-Type": "text/plain" },
-          body: "Asset not found"
-        };
-      }
-      throw error;
+  // Build request body if present
+  let requestBody = undefined;
+  if (body) {
+    if (isBase64Encoded) {
+      requestBody = Buffer.from(body, 'base64');
+    } else {
+      requestBody = body;
     }
   }
 
-  // Normalizar path para S3 (/ -> index.html, /about -> about.html)
-  const s3Key = path === "/" ? "index.html" : `${path.replace(/^\//, "")}.html`;
+  // Create Web Request
+  const request = new Request(url, {
+    method,
+    headers: requestHeaders,
+    body: requestBody && method !== 'GET' && method !== 'HEAD' ? requestBody : undefined,
+  });
 
-  try {
-    // 1. Intentar servir desde S3 si existe
-    try {
-      const s3Response = await s3.send(new GetObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: s3Key
-      }));
+  return request;
+}
 
-      // Leer el contenido del S3
-      const body = await s3Response.Body?.transformToString();
 
-      console.log(`✅ Served ${s3Key} from S3 cache`);
+export const handler = awslambda.streamifyResponse(
+  async (event, responseStream) => {
 
-      // Devolver el HTML desde S3 sin redirigir
-      return {
-        statusCode: 200,
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": s3Response.CacheControl || "public, max-age=3600",
-          "X-Cache": "HIT" // Para debugging
-        },
-        body
-      };
-    } catch (error: any) {
-      // Archivo no existe, continuar con SSR
-      if (error.name !== "NoSuchKey") {
-        console.warn("S3 read error:", error);
-      }
-    }
-
-    // 2. Generar página con RSC (usando el handler RSC compilado)
-    // Construir Request object para el handler RSC
-    const url = new URL(path, `https://${headers.host || 'localhost'}`);
-    const request = new Request(url.toString(), {
-      method: event.requestContext?.http?.method || 'GET',
-      headers: headers,
-    });
-
-    // Llamar al handler RSC que internamente:
-    // 1. Genera el RSC stream (entry.rsc.tsx)
-    // 2. Lo pasa al SSR para generar HTML (entry.ssr.tsx)
-    // 3. Inyecta el RSC stream en el HTML para hidratación
-    const handler = await getRscHandler();
-    const response = await handler(request);
-    const body = await response.text();
-    const responseHeaders: Record<string, string> = {};
-
-    response.headers.forEach((value: string, key: string) => {
-      responseHeaders[key] = value;
-    });
-
-    // 3. Si es estática, guardar en S3 para próximas peticiones
-    const cacheControl = responseHeaders["cache-control"] || responseHeaders["Cache-Control"];
-    const isStatic = cacheControl?.includes("s-maxage") && !cacheControl.includes("no-store");
-
-    if (isStatic) {
-      try {
-        await s3.send(new PutObjectCommand({
-          Bucket: BUCKET_NAME,
-          Key: s3Key,
-          Body: body,
-          ContentType: "text/html; charset=utf-8",
-          CacheControl: cacheControl
-        }));
-
-        console.log(`✅ Cached ${s3Key} to S3`);
-      } catch (s3Error) {
-        console.error("Failed to cache to S3:", s3Error);
-        // No fallar si no se puede cachear
-      }
-    }
-
-    // 4. Devolver respuesta
-    return {
-      statusCode: response.status,
+    const httpResponseMetadata = {
+      statusCode: 200,
       headers: {
-        ...responseHeaders,
-        "X-Cache": "MISS" // Para debugging
-      },
-      body
+        "Content-Type": "text/html"
+      }
     };
-  } catch (error) {
-    console.error("Error in handler:", error);
-    return {
-      statusCode: 500,
-      headers: { "Content-Type": "text/plain" },
-      body: "Internal Server Error"
-    };
+    responseStream = awslambda.HttpResponseStream.from(responseStream, httpResponseMetadata);
+
+    const request = getRequestFromEvent(event);
+    const rscHandler = await getRscHandler();
+    const qwes = await rscHandler(request);
+    const body = qwes.body;
+
+    if (!body) {
+      throw new Error("Response body is null");
+    }
+
+    await pipeline(body as unknown as Readable, responseStream);
   }
-};
+);

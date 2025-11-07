@@ -3,7 +3,8 @@
   "compilerOptions": {
     "types": [
       "vite/client",
-      "@vitejs/plugin-rsc/types"
+      "@vitejs/plugin-rsc/types",
+      "@types/aws-lambda"
     ],
   },
   "include": [

@@ -29,15 +29,10 @@ export default $config({
     // 2. Lambda SSR/ISR - genera páginas y las guarda en S3
     const handler = new sst.aws.Function("RendererHandler", {
       handler: "../apps/renderer/handler.handler",
+      runtime: "nodejs22.x",
       url: true,
       nodejs: {
-        install: ["react", "react-dom", "@aws-sdk/client-s3", "@vitejs/plugin-rsc"],
-        esbuild: {
-          external: [
-            "virtual:*", // Exclude Vite virtual modules
-            "@vitejs/plugin-rsc", // Exclude the plugin package itself
-          ],
-        }
+        install: ["react", "react-dom", "@aws-sdk/client-s3"],
       },
       // Copiar el directorio dist con los bundles RSC/SSR compilados
       copyFiles: [
@@ -46,6 +41,7 @@ export default $config({
           to: "dist"
         }
       ],
+      streaming: true,
       environment: {
         BUCKET_NAME: bucket.name,
         BUCKET_URL: bucket.domain,

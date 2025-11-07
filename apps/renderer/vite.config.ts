@@ -16,9 +16,6 @@ export default defineConfig({
     // - RSC stream serialization (React VDOM -> RSC stream)
     // - server functions handling
     rsc: {
-      resolve: {
-        noExternal: true, // Bundle all dependencies including @vitejs/plugin-rsc
-      },
       build: {
         minify: process.env.NODE_ENV === 'production',
         rollupOptions: {
