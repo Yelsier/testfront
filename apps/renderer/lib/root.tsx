@@ -1,7 +1,7 @@
 import { ModuleRenderer } from "./moduleloader"
 import { preloadSSRModule } from "./registry";
-import type { ResolveResponse } from "./mocks/types";
-import { getMockPage } from "./mocks/data";
+import type { ResolveResponse } from "../mocks/types";
+import { getMockPage } from "../mocks/data";
 
 const CMS_API_URL = process.env.CMS_API_URL;
 const USE_MOCK = process.env.USE_MOCK !== "false"; // Por defecto usa mocks

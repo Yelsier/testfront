@@ -61,13 +61,74 @@ const getRequestFromEvent = (event: any): Request => {
 export const handler = awslambda.streamifyResponse(
   async (event, responseStream) => {
 
-    const httpResponseMetadata = {
+    const path = event.rawPath || event.requestContext?.http?.path || "/";
+    const headers = event.headers || {};
+
+    // Si es un asset estático (js, css, etc), servir desde S3 directamente
+    if (path.match(/\.(js|css|json|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/)) {
+      try {
+        const s3Key = path.replace(/^\//, ""); // Quitar / inicial
+
+        const s3Response = await s3.send(new GetObjectCommand({
+          Bucket: BUCKET_NAME,
+          Key: s3Key
+        }));
+
+        const body = await s3Response.Body?.transformToByteArray();
+
+        // Determinar Content-Type
+        const ext = path.split(".").pop();
+        const contentTypes: Record<string, string> = {
+          "js": "application/javascript",
+          "css": "text/css",
+          "json": "application/json",
+          "png": "image/png",
+          "jpg": "image/jpeg",
+          "jpeg": "image/jpeg",
+          "gif": "image/gif",
+          "svg": "image/svg+xml",
+          "ico": "image/x-icon",
+          "woff": "font/woff",
+          "woff2": "font/woff2",
+          "ttf": "font/ttf",
+          "eot": "application/vnd.ms-fontobject"
+        };
+
+        responseStream = awslambda.HttpResponseStream.from(responseStream, {
+          statusCode: 200,
+          headers: {
+            "Content-Type": contentTypes[ext || ""] || "application/octet-stream",
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "Content-Encoding": s3Response.ContentEncoding || undefined,
+            "X-Served-From": "S3"
+          }
+        });
+
+        // Enviar el buffer directamente sin base64
+        responseStream.write(Buffer.from(body || []));
+        responseStream.end();
+        return;
+      } catch (error: any) {
+        if (error.name === "NoSuchKey") {
+          responseStream = awslambda.HttpResponseStream.from(responseStream, {
+            statusCode: 404,
+            headers: { "Content-Type": "text/plain" }
+          });
+
+          responseStream.write("Asset not found");
+          responseStream.end();
+          return;
+        }
+        throw error;
+      }
+    }
+
+    responseStream = awslambda.HttpResponseStream.from(responseStream, {
       statusCode: 200,
       headers: {
         "Content-Type": "text/html"
       }
-    };
-    responseStream = awslambda.HttpResponseStream.from(responseStream, httpResponseMetadata);
+    });
 
     const request = getRequestFromEvent(event);
     const rscHandler = await getRscHandler();
@@ -79,5 +140,7 @@ export const handler = awslambda.streamifyResponse(
     }
 
     await pipeline(body as unknown as Readable, responseStream);
+
+    return responseStream.end();
   }
 );

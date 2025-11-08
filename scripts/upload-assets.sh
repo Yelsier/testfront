@@ -16,30 +16,30 @@ echo "📦 Building assets..."
 cd "$(dirname "$0")/../apps/renderer"
 pnpm build
 
-# Verificar que existe el directorio dist
-if [ ! -d "dist" ]; then
-  echo "❌ Error: dist/ directory not found"
+# Verificar que existe el directorio dist/client
+if [ ! -d "dist/client" ]; then
+  echo "❌ Error: dist/client/ directory not found"
   exit 1
 fi
 
-echo "📂 Contents of dist/:"
-ls -lah dist/
+echo "📂 Contents of dist/client/:"
+ls -lah dist/client/
 
 # Comprimir todos los archivos .js y .mjs con gzip
 echo "🗜️  Compressing JavaScript files..."
-find dist -type f \( -name "*.js" -o -name "*.mjs" \) | while read -r file; do
+find dist/client -type f \( -name "*.js" -o -name "*.mjs" \) | while read -r file; do
   gzip -9 -c "$file" > "$file.gz"
   echo "  Compressed: $file"
 done
 
-# Subir todo el directorio dist/ al bucket con las configuraciones apropiadas
-echo "⬆️  Uploading all files from dist/ to S3..."
+# Subir todo el directorio dist/client/ al bucket con las configuraciones apropiadas
+echo "⬆️  Uploading all files from dist/client/ to S3..."
 
 # Subir archivos JS/MJS comprimidos con content-encoding gzip
-find dist -type f -name "*.gz" | while read -r gzfile; do
+find dist/client -type f -name "*.gz" | while read -r gzfile; do
   # Obtener ruta relativa sin el .gz
   originalfile="${gzfile%.gz}"
-  relativepath="${originalfile#dist/}"
+  relativepath="${originalfile#dist/client/}"
   
   # Determinar content-type
   if [[ "$originalfile" == *.css ]]; then
@@ -63,7 +63,7 @@ done
 
 # Subir archivos restantes (imágenes, fuentes, etc.) sin compresión
 echo "⬆️  Uploading remaining files..."
-aws s3 sync dist/ "s3://${BUCKET_NAME}/" \
+aws s3 sync dist/client/ "s3://${BUCKET_NAME}/" \
   --exclude "*.js" \
   --exclude "*.mjs" \
   --exclude "*.gz" \

@@ -40,7 +40,7 @@ export default function LazyImport({
         const run = async () => {
             console.time(`⏱️ Activation time: ${type}`);
             console.log(`📦 Importing module: ${type}`);
-            const mod = await import(`./modules/${type}`);
+            const mod = await import(`../modules/${type}.tsx`);
             setActiveComp(() => mod.default);
             console.timeEnd(`⏱️ Activation time: ${type}`);
             console.log(`✅ LazyImport active: ${type}`);
@@ -77,22 +77,6 @@ export default function LazyImport({
             console.log(`🧹 IO disconnected: ${type}`);
         };
     }, [activate, rootMargin, threshold, type]);
-
-    useEffect(() => {
-        if (!preloadOnHover || !ref.current) return;
-        const node = ref.current;
-        const onOver = () => {
-            console.log(`🪝 Preload on hover/touch → activating: ${type}`);
-            activate();
-        };
-        node.addEventListener("pointerover", onOver, { passive: true });
-        node.addEventListener("touchstart", onOver, { passive: true });
-        return () => {
-            node.removeEventListener("pointerover", onOver);
-            node.removeEventListener("touchstart", onOver);
-            console.log(`🧹 Hover listeners removed: ${type}`);
-        };
-    }, [preloadOnHover, activate, type]);
 
     return (
         <div ref={ref} data-lazy-import={type}>

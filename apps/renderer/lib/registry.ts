@@ -13,7 +13,7 @@ export async function preloadSSRModule(type: string): Promise<void> {
     }
 
     try {
-        const module = await import(`./modules/${type}.tsx`);
+        const module = await import(`../modules/${type}.tsx`);
         const Component = module.default;
         const Fallback = module.Fallback;
         const isLazy = module.isLazy;
