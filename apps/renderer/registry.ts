@@ -1,10 +1,10 @@
 import React, { lazy } from "react";
 
 // Cache de componentes lazy para evitar recrearlos infinitamente
-const moduleCache = new Map<string, { component: React.LazyExoticComponent<any>, fallback?: React.LazyExoticComponent<any> }>();
+const moduleCache = new Map<string, { component: React.LazyExoticComponent<any>, fallback?: React.LazyExoticComponent<any>, isLazy?: boolean }>();
 
 // Cache de componentes para SSR (componentes reales, no lazy)
-const ssrCache = new Map<string, { component: React.ComponentType<any>, fallback?: React.ComponentType<any> }>();
+const ssrCache = new Map<string, { component: React.ComponentType<any>, fallback?: React.ComponentType<any>, isLazy?: boolean }>();
 
 // Función para pre-cargar módulo en servidor
 export async function preloadSSRModule(type: string): Promise<void> {
@@ -16,9 +16,11 @@ export async function preloadSSRModule(type: string): Promise<void> {
         const module = await import(`./modules/${type}.tsx`);
         const Component = module.default;
         const Fallback = module.Fallback;
+        const isLazy = module.isLazy;
         ssrCache.set(type, {
             component: Component,
-            fallback: Fallback
+            fallback: Fallback,
+            isLazy
         });
     } catch (error) {
         console.warn(`Failed to preload SSR module ${type}:`, error);
@@ -27,7 +29,7 @@ export async function preloadSSRModule(type: string): Promise<void> {
     }
 }
 
-export const loadModule = (type: string): { component: React.ComponentType<any>, fallback?: React.ComponentType<any> } => {
+export const loadModule = (type: string): { component: React.ComponentType<any>, fallback?: React.ComponentType<any>, isLazy?: boolean } => {
     // En servidor: usar componentes pre-cargados del cache SSR
     if (typeof window === 'undefined') {
         const cache = ssrCache.get(type);
@@ -35,7 +37,7 @@ export const loadModule = (type: string): { component: React.ComponentType<any>,
             console.warn(`SSR Module ${type} not preloaded. Use preloadSSRModule first.`);
             return { component: () => React.createElement('div', null, `Loading ${type}...`) };
         }
-        return { component: cache.component, fallback: cache.fallback };
+        return { component: cache.component, fallback: cache.fallback, isLazy: cache.isLazy };
     }
 
     // En cliente: usar lazy components con cache (para chunks)
@@ -47,17 +49,15 @@ export const loadModule = (type: string): { component: React.ComponentType<any>,
     const fallbackComponent = lazy(() => import(`./modules/${type}.tsx`).then(module => ({
         default: module.Fallback
     })));
-    console.log({
-        lazyComponent,
-        fallbackComponent
-    });
+    const isLazy = true;
 
     console.log("⏳ Importing module:", type);
-    moduleCache.set(type, { component: lazyComponent, fallback: fallbackComponent });
+    moduleCache.set(type, { component: lazyComponent, fallback: fallbackComponent, isLazy });
 
     return {
         component: lazyComponent,
-        fallback: fallbackComponent
+        fallback: fallbackComponent,
+        isLazy
     };
 };
 

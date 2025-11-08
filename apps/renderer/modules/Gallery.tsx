@@ -9,6 +9,8 @@ interface GalleryProps {
     }>;
 }
 
+export const isLazy = true;
+
 export default function Gallery({ title = "Galería", images }: GalleryProps) {
     const [selectedImage, setSelectedImage] = useState<number | null>(null);
     const [interactionCount, setInteractionCount] = React.useState(0);
