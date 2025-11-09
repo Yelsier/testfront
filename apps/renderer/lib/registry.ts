@@ -45,11 +45,13 @@ export const loadModule = (type: string): { component: React.ComponentType<any>,
         return moduleCache.get(type)!;
     }
 
-    const lazyComponent = lazy(() => import(`./modules/${type}.tsx`));
-    const fallbackComponent = lazy(() => import(`./modules/${type}.tsx`).then(module => ({
+    const lazyComponent = lazy(() => import(`../modules/${type}.tsx`));
+    const fallbackComponent = lazy(() => import(`../modules/${type}.tsx`).then(module => ({
         default: module.Fallback
     })));
-    const isLazy = true;
+    const isLazy = lazy(() => import(`../modules/${type}.tsx`).then(module => ({
+        default: module.isLazy
+    }))) as unknown as boolean;
 
     console.log("⏳ Importing module:", type);
     moduleCache.set(type, { component: lazyComponent, fallback: fallbackComponent, isLazy });
