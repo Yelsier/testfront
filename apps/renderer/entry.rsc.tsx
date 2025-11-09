@@ -8,6 +8,8 @@ import {
 } from '@vitejs/plugin-rsc/rsc'
 import type { ReactFormState } from 'react-dom/client'
 import { Root } from './lib/root.tsx'
+import { getMockPage } from './mocks/data.ts'
+import { ResolveResponse } from './mocks/types.ts'
 
 // The schema of payload which is serialized into RSC stream on rsc environment
 // and deserialized on ssr/client environments.
@@ -20,6 +22,27 @@ export type RscPayload = {
     returnValue?: unknown
     // server action form state (e.g. useActionState) of progressive enhancement case
     formState?: ReactFormState
+}
+
+const CMS_API_URL = process.env.CMS_API_URL;
+const USE_MOCK = process.env.USE_MOCK !== "false"; // Por defecto usa mocks
+
+async function resolve(path: string): Promise<ResolveResponse> {
+    // Si tenemos API real y no queremos mocks
+    if (CMS_API_URL && !USE_MOCK) {
+        try {
+            throw new Error(`CMS API error: Api not implemented yet`);
+
+        } catch (error) {
+            console.error("CMS API error:", error);
+            console.warn("Falling back to mock data");
+            return getMockPage(path);
+        }
+    }
+
+    // 🧪 Usar mocks (desarrollo)
+    console.log(`📝 Using mock data for: ${path}`);
+    return getMockPage(path);
 }
 
 // the plugin by default assumes `rsc` entry having default export of request handler.
@@ -59,8 +82,9 @@ export default async function handler(request: Request): Promise<Response> {
     // so that new render reflects updated state from server function call
     // to achieve single round trip to mutate and fetch from server.
     const url = new URL(request.url)
+    const data = await resolve(url.pathname);
     const rscPayload: RscPayload = {
-        root: <Root url={url} />,
+        root: <Root modules={data.modules} seo={data.seo} />,
         formState,
         returnValue,
     }
@@ -97,11 +121,14 @@ export default async function handler(request: Request): Promise<Response> {
         debugNojs: url.searchParams.has('__nojs'),
     })
 
+    const cacheControl = data.renderMode === "dynamic" ? "no-store" : "public, max-age=3600";
+
     // respond html
     return new Response(htmlStream, {
         headers: {
             'Content-type': 'text/html',
             vary: 'accept',
+            'Cache-Control': cacheControl,
         },
     })
 }

@@ -4,8 +4,6 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 ///@ts-ignore
 import rscHandler from './dist/rsc/index.js';
-import { Root } from "./lib/root.js";
-import { renderToPipeableStream, renderToReadableStream } from "react-dom/server";
 
 const s3 = new S3Client({});
 const BUCKET_NAME = process.env.BUCKET_NAME!;
@@ -182,28 +180,43 @@ export const handler = awslambda.streamifyResponse(
 
     responseStream.end();
 
-    const reader = streamCopy.getReader();
-    const chunks: Uint8Array[] = [];
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-    }
-    const html = new TextDecoder("utf-8").decode(Buffer.concat(chunks))
+    const responseHeaders: Record<string, string> = {};
 
-    // Guardar el HTML en S3 para futuras peticiones
-    try {
-      await s3.send(new PutObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: s3Key,
-        Body: html,
-        ContentType: "text/html; charset=utf-8",
-        CacheControl: "public, max-age=3600"
-      }));
+    rscResponse.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
 
-      console.log(`💾 Cached ${s3Key} to S3`);
-    } catch (s3Error) {
-      console.error("Failed to cache to S3:", s3Error);
+    console.log(responseHeaders);
+
+
+    // 3. Si es estática, guardar en S3 para próximas peticiones
+    const cacheControl = responseHeaders["cache-control"] || responseHeaders["Cache-Control"];
+    const isStatic = !cacheControl.includes("no-store");
+
+    if (isStatic) {
+      const reader = streamCopy.getReader();
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+      const html = new TextDecoder("utf-8").decode(Buffer.concat(chunks))
+
+      // Guardar el HTML en S3 para futuras peticiones
+      try {
+        await s3.send(new PutObjectCommand({
+          Bucket: BUCKET_NAME,
+          Key: s3Key,
+          Body: html,
+          ContentType: "text/html; charset=utf-8",
+          CacheControl: "public, max-age=3600"
+        }));
+
+        console.log(`💾 Cached ${s3Key} to S3`);
+      } catch (s3Error) {
+        console.error("Failed to cache to S3:", s3Error);
+      }
     }
   }
 );

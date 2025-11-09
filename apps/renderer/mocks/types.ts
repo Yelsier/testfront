@@ -1,5 +1,5 @@
 // Tipos para la respuesta de la API CMS
-export type RenderMode = "static" | "dynamic" | "revalidate";
+export type RenderMode = "static" | "dynamic";
 
 export interface ModuleDef {
     type: string;
