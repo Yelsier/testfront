@@ -1,14 +1,11 @@
 import { ModuleDef, ModuleRenderer } from "./moduleloader"
 import { preloadSSRModule } from "./registry";
-import type { ResolveResponse, SEO } from "../mocks/types";
-import { getMockPage } from "../mocks/data";
+import type { SEO } from "../mocks/types";
+import Router from "./router";
 
 
-export async function Root(props: { modules: ModuleDef[], seo?: SEO }) {
-    const { modules, seo } = props;
-
-    const moduleTypes = [...new Set(modules.map(m => m.type))];
-    await Promise.all(moduleTypes.map(type => preloadSSRModule(type)));
+export async function Root(props: { modules: ModuleDef[], seo?: SEO, path: string }) {
+    const { modules, seo, path } = props;
 
     return (
         <html lang="en">
@@ -21,10 +18,23 @@ export async function Root(props: { modules: ModuleDef[], seo?: SEO }) {
                 )}
             </head>
             <body>
-                <div id="root">
-                    <ModuleRenderer modules={modules} />
-                </div>
+                <Router path={path}>
+                    <div id="root">
+                        <App modules={modules} />
+                    </div>
+                </Router>
             </body>
         </html>
+    )
+}
+
+export async function App(props: { modules: ModuleDef[] }) {
+    const { modules } = props;
+
+    const moduleTypes = [...new Set(modules.map(m => m.type))];
+    await Promise.all(moduleTypes.map(type => preloadSSRModule(type)));
+
+    return (
+        <ModuleRenderer modules={modules} />
     )
 }

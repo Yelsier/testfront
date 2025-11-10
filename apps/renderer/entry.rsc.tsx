@@ -7,7 +7,7 @@ import {
     decodeFormState,
 } from '@vitejs/plugin-rsc/rsc'
 import type { ReactFormState } from 'react-dom/client'
-import { Root } from './lib/root.tsx'
+import { App, Root } from './lib/root.tsx'
 import { getMockPage } from './mocks/data.ts'
 import { ResolveResponse } from './mocks/types.ts'
 
@@ -18,6 +18,7 @@ export type RscPayload = {
     // but this mechanism can be changed to render/fetch different parts of components
     // based on your own route conventions.
     root: React.ReactNode
+    app: React.ReactNode
     // server action return value of non-progressive enhancement case
     returnValue?: unknown
     // server action form state (e.g. useActionState) of progressive enhancement case
@@ -84,7 +85,8 @@ export default async function handler(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const data = await resolve(url.pathname);
     const rscPayload: RscPayload = {
-        root: <Root modules={data.modules} seo={data.seo} />,
+        root: <Root modules={data.modules} seo={data.seo} path={url.pathname} />,
+        app: <App modules={data.modules} />,
         formState,
         returnValue,
     }
