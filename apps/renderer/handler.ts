@@ -126,34 +126,38 @@ export const handler = awslambda.streamifyResponse(
     const s3Key = path === "/" ? "index.html" : `${path.replace(/^\//, "")}.html`;
 
     // 1. Intentar servir HTML desde S3 (cache)
-    try {
-      const s3Response = await s3.send(new GetObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: s3Key
-      }));
+    // if has __rsc or __html or __partial query, skip cache
+    const isCacheBypass = Object.keys(event.queryStringParameters || {}).some(q => ["__rsc", "__html", "__partial"].includes(q));
+    if (!isCacheBypass) {
+      try {
+        const s3Response = await s3.send(new GetObjectCommand({
+          Bucket: BUCKET_NAME,
+          Key: s3Key
+        }));
 
-      const htmlContent = await s3Response.Body?.transformToString();
+        const htmlContent = await s3Response.Body?.transformToString();
 
-      console.log(`✅ Serving ${s3Key} from S3 cache`);
+        console.log(`✅ Serving ${s3Key} from S3 cache`);
 
-      responseStream = awslambda.HttpResponseStream.from(responseStream, {
-        statusCode: 200,
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
-          "Cache-Control": "public, max-age=3600",
-          "X-Cache": "HIT"
+        responseStream = awslambda.HttpResponseStream.from(responseStream, {
+          statusCode: 200,
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+            "X-Cache": "HIT"
+          }
+        });
+
+        responseStream.write(htmlContent);
+        responseStream.end();
+        return;
+      } catch (error: any) {
+        // Si no existe en S3, continuar con SSR
+        if (error.name !== "NoSuchKey") {
+          console.warn("S3 read error:", error);
         }
-      });
-
-      responseStream.write(htmlContent);
-      responseStream.end();
-      return;
-    } catch (error: any) {
-      // Si no existe en S3, continuar con SSR
-      if (error.name !== "NoSuchKey") {
-        console.warn("S3 read error:", error);
+        console.log(`🔄 Cache miss for ${s3Key}, generating SSR`);
       }
-      console.log(`🔄 Cache miss for ${s3Key}, generating SSR`);
     }
 
     // 2. Generar HTML con RSC+SSR (solo si no está en cache)
@@ -187,32 +191,34 @@ export const handler = awslambda.streamifyResponse(
     });
 
     // 3. Si es estática, guardar en S3 para próximas peticiones
-    const cacheControl = responseHeaders["cache-control"] || responseHeaders["Cache-Control"];
-    const isStatic = !cacheControl.includes("no-store");
+    if (!isCacheBypass) {
+      const cacheControl = responseHeaders["cache-control"] || responseHeaders["Cache-Control"];
+      const isStatic = !cacheControl.includes("no-store");
 
-    if (isStatic) {
-      const reader = streamCopy.getReader();
-      const chunks: Uint8Array[] = [];
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      const html = new TextDecoder("utf-8").decode(Buffer.concat(chunks))
+      if (isStatic) {
+        const reader = streamCopy.getReader();
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+        const html = new TextDecoder("utf-8").decode(Buffer.concat(chunks))
 
-      // Guardar el HTML en S3 para futuras peticiones
-      try {
-        await s3.send(new PutObjectCommand({
-          Bucket: BUCKET_NAME,
-          Key: s3Key,
-          Body: html,
-          ContentType: "text/html; charset=utf-8",
-          CacheControl: "public, max-age=3600"
-        }));
+        // Guardar el HTML en S3 para futuras peticiones
+        try {
+          await s3.send(new PutObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: s3Key,
+            Body: html,
+            ContentType: "text/html; charset=utf-8",
+            CacheControl: "public, max-age=3600"
+          }));
 
-        console.log(`💾 Cached ${s3Key} to S3`);
-      } catch (s3Error) {
-        console.error("Failed to cache to S3:", s3Error);
+          console.log(`💾 Cached ${s3Key} to S3`);
+        } catch (s3Error) {
+          console.error("Failed to cache to S3:", s3Error);
+        }
       }
     }
   }
