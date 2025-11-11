@@ -18,7 +18,6 @@ export type RscPayload = {
     // but this mechanism can be changed to render/fetch different parts of components
     // based on your own route conventions.
     root: React.ReactNode
-    app: React.ReactNode
     // server action return value of non-progressive enhancement case
     returnValue?: unknown
     // server action form state (e.g. useActionState) of progressive enhancement case
@@ -28,7 +27,7 @@ export type RscPayload = {
 const CMS_API_URL = process.env.CMS_API_URL;
 const USE_MOCK = process.env.USE_MOCK !== "false"; // Por defecto usa mocks
 
-async function resolve(path: string): Promise<ResolveResponse> {
+export async function resolve(path: string): Promise<ResolveResponse> {
     // Si tenemos API real y no queremos mocks
     if (CMS_API_URL && !USE_MOCK) {
         try {
@@ -85,8 +84,7 @@ export default async function handler(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const data = await resolve(url.pathname);
     const rscPayload: RscPayload = {
-        root: <Root modules={data.modules} seo={data.seo} path={url.pathname} />,
-        app: <App modules={data.modules} />,
+        root: url.searchParams.has('__partial') ? <App modules={data.modules} /> : <Root modules={data.modules} seo={data.seo} path={url.pathname} />,
         formState,
         returnValue,
     }

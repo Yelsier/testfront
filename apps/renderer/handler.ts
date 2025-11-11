@@ -186,9 +186,6 @@ export const handler = awslambda.streamifyResponse(
       responseHeaders[key] = value;
     });
 
-    console.log(responseHeaders);
-
-
     // 3. Si es estática, guardar en S3 para próximas peticiones
     const cacheControl = responseHeaders["cache-control"] || responseHeaders["Cache-Control"];
     const isStatic = !cacheControl.includes("no-store");

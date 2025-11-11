@@ -19,9 +19,7 @@ export async function Root(props: { modules: ModuleDef[], seo?: SEO, path: strin
             </head>
             <body>
                 <Router path={path}>
-                    <div id="root">
-                        <App modules={modules} />
-                    </div>
+                    <App modules={modules} />
                 </Router>
             </body>
         </html>
@@ -35,6 +33,8 @@ export async function App(props: { modules: ModuleDef[] }) {
     await Promise.all(moduleTypes.map(type => preloadSSRModule(type)));
 
     return (
-        <ModuleRenderer modules={modules} />
+        <div id="root">
+            <ModuleRenderer modules={modules} />
+        </div>
     )
 }

@@ -21,6 +21,11 @@ export const mockPages: Record<string, ResolveResponse> = {
                 props: {}
             },
             {
+                type: "Counter",
+                key: "counter-1",
+                props: {}
+            },
+            {
                 type: "HeavyServer",
                 key: "heavy-server-1",
                 props: {}
@@ -56,7 +61,17 @@ export const mockPages: Record<string, ResolveResponse> = {
                 props: {
                     title: "Sobre Nosotros (Mock)"
                 }
-            }
+            },
+            {
+                type: "Counter",
+                key: "counter-1",
+                props: {}
+            },
+            {
+                type: "HeavyServer2",
+                key: "heavy-server-2",
+                props: {}
+            },
         ],
         seo: {
             title: "About - CMS",
