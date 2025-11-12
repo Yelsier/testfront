@@ -2,21 +2,19 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-///@ts-ignore
-import rscHandler from './dist/rsc/index.js';
 
 const s3 = new S3Client({});
 const BUCKET_NAME = process.env.BUCKET_NAME!;
-let rscHandler: (req: Request) => Promise<Response> | Response;
+let rscHandlerCache: (req: Request) => Promise<Response> | Response;
 
 async function getRscHandler() {
-  if (!rscHandler) {
+  if (!rscHandlerCache) {
     // IMPORTA EL BUNDLE COMPILADO POR Vite (no fuentes, no "virtual:")
     //@ts-ignore
     const mod = await import("./dist/rsc/index.js");
-    rscHandler = (mod.default ?? mod.handler ?? mod.render) as any;
+    rscHandlerCache = (mod.default ?? mod.handler ?? mod.render) as any;
   }
-  return rscHandler!;
+  return rscHandlerCache!;
 }
 
 const getRequestFromEvent = (event: any): Request => {

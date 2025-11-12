@@ -32,7 +32,7 @@ export default $config({
       runtime: "nodejs22.x",
       url: true,
       nodejs: {
-        install: ["react", "react-dom", "@aws-sdk/client-s3"],
+        install: ["@aws-sdk/client-s3"],
       },
       // Copiar el directorio dist con los bundles RSC/SSR compilados
       copyFiles: [
