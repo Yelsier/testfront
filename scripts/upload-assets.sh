@@ -14,7 +14,6 @@ fi
 # Build del proyecto
 echo "📦 Building assets..."
 cd "$(dirname "$0")/../apps/renderer"
-pnpm build
 
 # Verificar que existe el directorio dist/client
 if [ ! -d "dist/client" ]; then

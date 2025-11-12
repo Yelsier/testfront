@@ -2,6 +2,7 @@ import { ModuleDef, ModuleRenderer } from "./moduleloader"
 import { preloadSSRModule } from "./registry";
 import type { SEO } from "../mocks/types";
 import Router from "./router";
+import { PageMetaUpdater } from "./PageMetaUpdater";
 
 
 export async function Root(props: { modules: ModuleDef[], seo?: SEO, path: string }) {
@@ -26,14 +27,15 @@ export async function Root(props: { modules: ModuleDef[], seo?: SEO, path: strin
     )
 }
 
-export async function App(props: { modules: ModuleDef[] }) {
-    const { modules } = props;
+export async function App(props: { modules: ModuleDef[], seo?: SEO }) {
+    const { modules, seo } = props;
 
     const moduleTypes = [...new Set(modules.map(m => m.type))];
     await Promise.all(moduleTypes.map(type => preloadSSRModule(type)));
 
     return (
         <div id="root">
+            <PageMetaUpdater title={seo?.title} description={seo?.description} />
             <ModuleRenderer modules={modules} />
         </div>
     )

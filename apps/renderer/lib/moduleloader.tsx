@@ -1,6 +1,7 @@
 import { loadModule } from "./registry";
 import { Suspense } from "react";
 import LazyImport from "./island";
+import { ErrorBoundary } from "./ErrorBoundary";
 
 export type ModuleDef = { type: string; key: string; props: any };
 
@@ -21,6 +22,7 @@ export function SmartModule({ module, index }: { module: ModuleDef; index: numbe
   if (shouldBeLazy) {
     return (
       <LazyImport
+        key={`lazy-${module.key}-${module.type}`}
         type={module.type}
         props={module.props}
         fallback={F ? <F {...module.props} /> : null}
@@ -44,6 +46,9 @@ export function SmartModule({ module, index }: { module: ModuleDef; index: numbe
 
 export function ModuleRenderer({ modules }: { modules: ModuleDef[] }) {
   return modules.map((m, index) => (
-    <SmartModule key={m.key} module={m} index={index} />
+    <ErrorBoundary key={`error-${m.key}`}>
+
+      <SmartModule key={m.key} module={m} index={index} />
+    </ErrorBoundary>
   ));
 }

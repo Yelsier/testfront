@@ -84,7 +84,7 @@ export default async function handler(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const data = await resolve(url.pathname);
     const rscPayload: RscPayload = {
-        root: url.searchParams.has('__partial') ? <App modules={data.modules} /> : <Root modules={data.modules} seo={data.seo} path={url.pathname} />,
+        root: url.searchParams.has('__partial') ? <App modules={data.modules} seo={data.seo} /> : <Root modules={data.modules} seo={data.seo} path={url.pathname} />,
         formState,
         returnValue,
     }

@@ -1,7 +1,6 @@
 "use client"
-
 import { CallServerCallback, createFromFetch } from "@vitejs/plugin-rsc/browser";
-import { createContext, useCallback, useEffect, useMemo, useState, startTransition } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, startTransition } from "react";
 
 type RouterCtx = {
     path: string;
@@ -10,6 +9,30 @@ type RouterCtx = {
 };
 
 export const RouterContext = createContext<RouterCtx | null>(null);
+
+export function useRouter() {
+    const ctx = useContext(RouterContext);
+    if (!ctx) throw new Error('useRouter must be used within Router');
+    return ctx;
+}
+
+// Hook para actualizar el título y meta tags
+export function usePageMeta(title?: string, description?: string) {
+    useEffect(() => {
+        if (title) {
+            document.title = title;
+        }
+        if (description) {
+            let metaDesc = document.querySelector('meta[name="description"]');
+            if (!metaDesc) {
+                metaDesc = document.createElement('meta');
+                metaDesc.setAttribute('name', 'description');
+                document.head.appendChild(metaDesc);
+            }
+            metaDesc.setAttribute('content', description);
+        }
+    }, [title, description]);
+}
 
 // Cache para RSC responses
 type CacheEntry = {
@@ -40,8 +63,34 @@ function fetchRSC(pathname: string): Promise<React.ReactNode> {
     if (!entry) {
         const promise = (async () => {
             const url = `${pathname}?__rsc&__partial`;
-            const res = await fetch(url, { credentials: 'include' });
+            console.log('🔍 Fetching RSC:', url);
+            const res = await fetch(url, {
+                credentials: 'include',
+                headers: {
+                    'Accept': 'text/x-component'
+                }
+            });
+
+            console.log('📦 RSC Response:', {
+                status: res.status,
+                contentType: res.headers.get('content-type'),
+                url: res.url
+            });
+
+            // Verificar que la respuesta es correcta
+            if (!res.ok) {
+                throw new Error(`Failed to fetch RSC: ${res.status} ${res.statusText}`);
+            }
+
+            const contentType = res.headers.get('content-type');
+            if (!contentType?.includes('text/x-component')) {
+                console.error('Invalid Content-Type:', contentType);
+                console.error('Response URL:', res.url);
+                throw new Error(`Expected text/x-component but got ${contentType}`);
+            }
+
             const result = await createFromFetch(Promise.resolve(res), { callServer }) as any;
+            console.log('✅ RSC parsed successfully');
             // Extrae el contenido (ajusta según tu estructura)
             return result?.root || result;
         })();
@@ -51,7 +100,10 @@ function fetchRSC(pathname: string): Promise<React.ReactNode> {
 
         promise
             .then(v => { entry!.value = v; })
-            .catch(e => { entry!.error = e; });
+            .catch(e => {
+                console.error('❌ RSC fetch error:', e);
+                entry!.error = e;
+            });
     }
 
     if (entry.error) throw entry.error;

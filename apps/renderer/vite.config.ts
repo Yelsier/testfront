@@ -63,8 +63,8 @@ export default defineConfig({
             index: './entry.browser.tsx',
           },
           output: {
-            entryFileNames: "index.js",
-            chunkFileNames: "chunks/[name].js",
+            entryFileNames: "index-[hash].js",
+            chunkFileNames: "chunks/[name]-[hash].js",
             assetFileNames: "assets/[name]-[hash].[ext]"
           }
         },

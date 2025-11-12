@@ -34,7 +34,10 @@ const getRequestFromEvent = (event: any): Request => {
   for (const [key, value] of Object.entries(headers)) {
     requestHeaders.set(key, value as string);
   }
-  requestHeaders.set("accept", "text/html");
+  // Solo setear accept si no viene en los headers originales
+  if (!requestHeaders.has("accept")) {
+    requestHeaders.set("accept", "text/html");
+  }
 
   // Build request body if present
   let requestBody = undefined;
@@ -122,13 +125,28 @@ export const handler = awslambda.streamifyResponse(
       }
     }
 
+    const request = getRequestFromEvent(event);
+    const rscHandler = await getRscHandler();
+    const rscResponse = await rscHandler(request);
+    const body = rscResponse.body;
+
+    if (!body) {
+      throw new Error("Response body is null");
+    }
+
+    const responseHeaders: Record<string, string> = {};
+    rscResponse.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+
+    // Determinar si es una petición RSC
+    const isRscRequest = responseHeaders["content-type"]?.includes("text/x-component");
+
     // Normalizar path para S3 (/ -> index.html, /about -> about.html)
     const s3Key = path === "/" ? "index.html" : `${path.replace(/^\//, "")}.html`;
 
     // 1. Intentar servir HTML desde S3 (cache)
-    // if has __rsc or __html or __partial query, skip cache
-    const isCacheBypass = Object.keys(event.queryStringParameters || {}).some(q => ["__rsc", "__html", "__partial"].includes(q));
-    if (!isCacheBypass) {
+    /* if (!isRscRequest) {
       try {
         const s3Response = await s3.send(new GetObjectCommand({
           Bucket: BUCKET_NAME,
@@ -158,9 +176,28 @@ export const handler = awslambda.streamifyResponse(
         }
         console.log(`🔄 Cache miss for ${s3Key}, generating SSR`);
       }
-    }
+    } */
+
+    console.log(`📊 Request: ${path}, isRscRequest: ${isRscRequest}, Content-Type: ${responseHeaders["content-type"]}`);
 
     // 2. Generar HTML con RSC+SSR (solo si no está en cache)
+    // Para RSC, usar el Content-Type correcto y no cachear
+    if (isRscRequest) {
+      responseStream = awslambda.HttpResponseStream.from(responseStream, {
+        statusCode: 200,
+        headers: {
+          "Content-Type": responseHeaders["content-type"] || "text/x-component",
+          "Cache-Control": "no-store",
+          "X-Cache": "BYPASS"
+        }
+      });
+
+      await pipeline(body as unknown as Readable, responseStream);
+      responseStream.end();
+      return;
+    }
+
+    // Para HTML regular, cachear en S3
     responseStream = awslambda.HttpResponseStream.from(responseStream, {
       statusCode: 200,
       headers: {
@@ -169,57 +206,39 @@ export const handler = awslambda.streamifyResponse(
       }
     });
 
-    const request = getRequestFromEvent(event);
-    const rscHandler = await getRscHandler();
-    const rscResponse = await rscHandler(request);
-    const body = rscResponse.body;
-
-    if (!body) {
-      throw new Error("Response body is null");
-    }
-
     const [stream, streamCopy] = body.tee();
 
     await pipeline(stream as unknown as Readable, responseStream);
-
     responseStream.end();
 
-    const responseHeaders: Record<string, string> = {};
-
-    rscResponse.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-    });
-
     // 3. Si es estática, guardar en S3 para próximas peticiones
-    if (!isCacheBypass) {
-      const cacheControl = responseHeaders["cache-control"] || responseHeaders["Cache-Control"];
-      const isStatic = !cacheControl.includes("no-store");
+    /* const cacheControl = responseHeaders["cache-control"] || responseHeaders["Cache-Control"];
+    const isStatic = !cacheControl?.includes("no-store");
 
-      if (isStatic) {
-        const reader = streamCopy.getReader();
-        const chunks: Uint8Array[] = [];
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-        }
-        const html = new TextDecoder("utf-8").decode(Buffer.concat(chunks))
-
-        // Guardar el HTML en S3 para futuras peticiones
-        try {
-          await s3.send(new PutObjectCommand({
-            Bucket: BUCKET_NAME,
-            Key: s3Key,
-            Body: html,
-            ContentType: "text/html; charset=utf-8",
-            CacheControl: "public, max-age=3600"
-          }));
-
-          console.log(`💾 Cached ${s3Key} to S3`);
-        } catch (s3Error) {
-          console.error("Failed to cache to S3:", s3Error);
-        }
+    if (isStatic) {
+      const reader = streamCopy.getReader();
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        chunks.push(value);
       }
-    }
+      const html = new TextDecoder("utf-8").decode(Buffer.concat(chunks))
+
+      // Guardar el HTML en S3 para futuras peticiones
+      try {
+        await s3.send(new PutObjectCommand({
+          Bucket: BUCKET_NAME,
+          Key: s3Key,
+          Body: html,
+          ContentType: "text/html; charset=utf-8",
+          CacheControl: "public, max-age=3600"
+        }));
+
+        console.log(`💾 Cached ${s3Key} to S3`);
+      } catch (s3Error) {
+        console.error("Failed to cache to S3:", s3Error);
+      }
+    } */
   }
 );

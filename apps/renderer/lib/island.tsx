@@ -73,8 +73,12 @@ export default function LazyImport({
         io.observe(node);
 
         return () => {
-            io.disconnect();
-            console.log(`🧹 IO disconnected: ${type}`);
+            try {
+                io.disconnect();
+                console.log(`🧹 IO disconnected: ${type}`);
+            } catch (e) {
+                console.warn(`⚠️ Error disconnecting IO for ${type}:`, e);
+            }
         };
     }, [activate, rootMargin, threshold, type]);
 
