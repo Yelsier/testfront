@@ -1,27 +1,25 @@
 {
-    "name": "testfront",
-    "version": "1.0.0",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "build": "pnpm --filter renderer build",
-        "dev": "pnpm --filter renderer dev",
-        "sst:deploy": "cd infra && sst deploy --stage production",
-        "sst:remove": "cd infra && sst remove --stage production",
-        "sst:console": "cd infra && sst dev",
-        "upload-assets": "bash scripts/upload-assets.sh",
-        "list-resources": "bash scripts/list-resources.sh",
-        "cleanup-all": "cd infra && bash ../scripts/cleanup-all.sh"
-    },
-    "devDependencies": {
-        "@types/aws-lambda": "8.10.157",
-        "@types/node": "^22.9.0",
-        "@types/react": "^19.2.2",
-        "@types/react-dom": "^19.2.2",
-        "@vitejs/plugin-rsc": "^0.5.1",
-        "typescript": "^5.6.3"
-    },
-    "dependencies": {
-        "sst": "3.17.21"
-    }
+  "name": "testfront",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm --filter renderer build",
+    "dev": "pnpm --filter renderer dev",
+    "sst": "cd infra && sst ",
+    "upload-assets": "bash scripts/upload-assets.sh",
+    "list-resources": "bash scripts/list-resources.sh",
+    "cleanup-all": "cd infra && bash ../scripts/cleanup-all.sh"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.157",
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-rsc": "^0.5.1",
+    "typescript": "^5.6.3"
+  },
+  "dependencies": {
+    "sst": "3.17.21"
+  }
 }
