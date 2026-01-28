@@ -1,200 +1,231 @@
-"use client"
-import { CallServerCallback, createFromFetch } from "@vitejs/plugin-rsc/browser";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, startTransition } from "react";
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  startTransition,
+} from "react";
 
 type RouterCtx = {
-    path: string;
-    navigate: (to: string, opts?: { replace?: boolean; scroll?: boolean }) => void;
-    isPending: boolean;
+  path: string;
+  navigate: (
+    to: string,
+    opts?: { replace?: boolean; scroll?: boolean },
+  ) => void;
+  isPending: boolean;
 };
 
 export const RouterContext = createContext<RouterCtx | null>(null);
 
 export function useRouter() {
-    const ctx = useContext(RouterContext);
-    if (!ctx) throw new Error('useRouter must be used within Router');
-    return ctx;
+  const ctx = useContext(RouterContext);
+  if (!ctx) throw new Error("useRouter must be used within Router");
+  return ctx;
 }
 
 // Hook para actualizar el título y meta tags
 export function usePageMeta(title?: string, description?: string) {
-    useEffect(() => {
-        if (title) {
-            document.title = title;
-        }
-        if (description) {
-            let metaDesc = document.querySelector('meta[name="description"]');
-            if (!metaDesc) {
-                metaDesc = document.createElement('meta');
-                metaDesc.setAttribute('name', 'description');
-                document.head.appendChild(metaDesc);
-            }
-            metaDesc.setAttribute('content', description);
-        }
-    }, [title, description]);
+  useEffect(() => {
+    if (title) {
+      document.title = title;
+    }
+    if (description) {
+      let metaDesc = document.querySelector('meta[name="description"]');
+      if (!metaDesc) {
+        metaDesc = document.createElement("meta");
+        metaDesc.setAttribute("name", "description");
+        document.head.appendChild(metaDesc);
+      }
+      metaDesc.setAttribute("content", description);
+    }
+  }, [title, description]);
+}
+
+// --- lazy loader del runtime browser de vite-rsc ---
+type ViteRscBrowser = typeof import("@vitejs/plugin-rsc/browser");
+let viteRscBrowserPromise: Promise<ViteRscBrowser> | null = null;
+
+function getViteRscBrowser(): Promise<ViteRscBrowser> {
+  if (!viteRscBrowserPromise) {
+    viteRscBrowserPromise = import("@vitejs/plugin-rsc/browser");
+  }
+  return viteRscBrowserPromise;
 }
 
 // Cache para RSC responses
 type CacheEntry = {
-    promise: Promise<React.ReactNode>;
-    value?: React.ReactNode;
-    error?: unknown;
+  promise: Promise<React.ReactNode>;
+  value?: React.ReactNode;
+  error?: unknown;
 };
-
 const cache = new Map<string, CacheEntry>();
 
-const callServer: CallServerCallback = async (id, args) => {
-    const res = await fetch('/_rsc', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'RSC-Action': id as string
-        },
-        body: JSON.stringify(args),
-        credentials: 'include',
-    });
-    return createFromFetch(Promise.resolve(res), { callServer });
-};
-
-function fetchRSC(pathname: string): Promise<React.ReactNode> {
-    const key = pathname;
-    let entry = cache.get(key);
-
-    if (!entry) {
-        const promise = (async () => {
-            const url = `${pathname}?__rsc&__partial`;
-            console.log('🔍 Fetching RSC:', url);
-            const res = await fetch(url, {
-                credentials: 'include',
-                headers: {
-                    'Accept': 'text/x-component'
-                }
-            });
-
-            console.log('📦 RSC Response:', {
-                status: res.status,
-                contentType: res.headers.get('content-type'),
-                url: res.url
-            });
-
-            // Verificar que la respuesta es correcta
-            if (!res.ok) {
-                throw new Error(`Failed to fetch RSC: ${res.status} ${res.statusText}`);
-            }
-
-            const contentType = res.headers.get('content-type');
-            if (!contentType?.includes('text/x-component')) {
-                console.error('Invalid Content-Type:', contentType);
-                console.error('Response URL:', res.url);
-                throw new Error(`Expected text/x-component but got ${contentType}`);
-            }
-
-            const result = await createFromFetch(Promise.resolve(res), { callServer }) as any;
-            console.log('✅ RSC parsed successfully');
-            // Extrae el contenido (ajusta según tu estructura)
-            return result?.root || result;
-        })();
-
-        entry = { promise };
-        cache.set(key, entry);
-
-        promise
-            .then(v => { entry!.value = v; })
-            .catch(e => {
-                console.error('❌ RSC fetch error:', e);
-                entry!.error = e;
-            });
-    }
-
-    if (entry.error) throw entry.error;
-    if (entry.value !== undefined) return Promise.resolve(entry.value);
-    return entry.promise;
+function normalize(to: string) {
+  const u = new URL(to, window.location.origin);
+  return u.pathname + u.search;
+}
+function rscUrl(pathname: string) {
+  return `${pathname}${pathname.includes("?") ? "&" : "?"}__rsc&__partial`;
 }
 
-// Función pública para prefetch
-export function prefetchRoute(pathname: string): void {
-    fetchRSC(pathname).catch(error => {
-        console.error('Prefetch error:', error);
-    });
+async function callServer(id: string, args: unknown[]) {
+  // solo browser
+  if (typeof window === "undefined") {
+    throw new Error("callServer called on server");
+  }
+
+  const { createFromFetch } = await getViteRscBrowser();
+
+  const res = await fetch("/_rsc", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "RSC-Action": id,
+    },
+    body: JSON.stringify(args),
+    credentials: "include",
+  });
+
+  return createFromFetch(Promise.resolve(res), {
+    callServer: (id2: any, args2: any) =>
+      callServer(id2 as string, args2 as any),
+  });
 }
 
-const Router: React.FC<{
-    children?: React.ReactNode
-    path: string
-}> = ({ children, path }) => {
-    // Inicializa con el contenido del servidor para hidratación
-    const [currentPath, setCurrentPath] = useState(path);
-    const [tree, setTree] = useState<React.ReactNode>(children);
-    const [isPending, setIsPending] = useState(false);
+function fetchRSC(to: string): Promise<React.ReactNode> {
+  if (typeof window === "undefined") {
+    // en SSR nunca deberíamos llamar esto
+    return Promise.reject(new Error("fetchRSC called on server"));
+  }
 
-    const navigate = useCallback((to: string, opts?: { replace?: boolean; scroll?: boolean }) => {
-        const url = new URL(to, window.location.origin);
-        const pathname = url.pathname + url.search;
+  const pathname = normalize(to);
+  const key = pathname;
 
-        // Actualiza la URL
-        if (opts?.replace) {
-            window.history.replaceState(null, '', to);
-        } else {
-            window.history.pushState(null, '', to);
-        }
+  let entry = cache.get(key);
+  if (!entry) {
+    const promise = (async () => {
+      const { createFromFetch } = await getViteRscBrowser();
 
-        setCurrentPath(pathname);
+      const url = rscUrl(pathname);
+      const res = await fetch(url, {
+        credentials: "include",
+        headers: { Accept: "text/x-component" },
+      });
 
-        startTransition(() => {
-            setIsPending(true);
-            fetchRSC(pathname)
-                .then(newTree => {
-                    setTree(newTree);
-                    setIsPending(false);
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`RSC ${res.status}: ${text.slice(0, 200)}`);
+      }
 
-                    // Scroll opcional
-                    if (opts?.scroll !== false) {
-                        window.scrollTo(0, 0);
-                    }
-                })
-                .catch(error => {
-                    console.error('Navigation error:', error);
-                    setIsPending(false);
-                });
-        });
-    }, []);
+      const ct = res.headers.get("content-type") || "";
+      if (!ct.includes("text/x-component")) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Expected RSC, got ${ct}. Body: ${text.slice(0, 200)}`);
+      }
 
-    // Maneja navegación con botones del navegador
-    useEffect(() => {
-        const handlePopState = () => {
-            const pathname = window.location.pathname + window.location.search;
-            setCurrentPath(pathname);
+      const result = (await createFromFetch(Promise.resolve(res), {
+        callServer: (id: any, args: any) =>
+          callServer(id as string, args as any),
+      })) as any;
 
-            startTransition(() => {
-                setIsPending(true);
-                fetchRSC(pathname)
-                    .then(newTree => {
-                        setTree(newTree);
-                        setIsPending(false);
-                    })
-                    .catch(error => {
-                        console.error('Navigation error:', error);
-                        setIsPending(false);
-                    });
-            });
-        };
+      return result?.root || result;
+    })();
 
-        window.addEventListener('popstate', handlePopState);
-        return () => window.removeEventListener('popstate', handlePopState);
-    }, []);
+    entry = { promise };
+    cache.set(key, entry);
 
-    const ctx = useMemo<RouterCtx>(() => ({
-        path: currentPath,
-        navigate,
-        isPending
-    }), [currentPath, navigate, isPending]);
+    promise.then((v) => (entry!.value = v)).catch((e) => (entry!.error = e));
+  }
 
-    // isPending puede usarse para mostrar un indicador de carga global o crear transiciones entre paginas
+  if (entry.error) throw entry.error;
+  if (entry.value !== undefined) return Promise.resolve(entry.value);
+  return entry.promise;
+}
+
+export function prefetchRoute(to: string) {
+  if (typeof window === "undefined") return;
+  fetchRSC(to).catch(() => {});
+}
+
+const Router: React.FC<{ children?: React.ReactNode; path: string }> = ({
+  children,
+  path,
+}) => {
+  // ✅ SSR-safe: si esto llegase a renderizarse en server, no rompe nada
+  if (typeof window === "undefined") {
+    const ctx: RouterCtx = {
+      path,
+      navigate: () => {},
+      isPending: false,
+    };
     return (
-        <RouterContext.Provider value={ctx}>
-            {tree}
-        </RouterContext.Provider>
+      <RouterContext.Provider value={ctx}>{children}</RouterContext.Provider>
     );
-}
+  }
+
+  const [currentPath, setCurrentPath] = useState(path);
+  const [tree, setTree] = useState<React.ReactNode>(children);
+  const [isPending, setIsPending] = useState(false);
+
+  const navigate = useCallback(
+    (to: string, opts?: { replace?: boolean; scroll?: boolean }) => {
+      const pathname = normalize(to);
+
+      if (opts?.replace) window.history.replaceState(null, "", pathname);
+      else window.history.pushState(null, "", pathname);
+
+      setCurrentPath(pathname);
+
+      startTransition(() => {
+        setIsPending(true);
+        fetchRSC(pathname)
+          .then((newTree) => {
+            setTree(newTree);
+            setIsPending(false);
+            if (opts?.scroll !== false) window.scrollTo(0, 0);
+          })
+          .catch((err) => {
+            console.error("Navigation error:", err);
+            setIsPending(false);
+          });
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathname = window.location.pathname + window.location.search;
+      setCurrentPath(pathname);
+
+      startTransition(() => {
+        setIsPending(true);
+        fetchRSC(pathname)
+          .then((newTree) => {
+            setTree(newTree);
+            setIsPending(false);
+          })
+          .catch((err) => {
+            console.error("Navigation error:", err);
+            setIsPending(false);
+          });
+      });
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const ctx = useMemo<RouterCtx>(
+    () => ({ path: currentPath, navigate, isPending }),
+    [currentPath, navigate, isPending],
+  );
+
+  return <RouterContext.Provider value={ctx}>{tree}</RouterContext.Provider>;
+};
 
 export default Router;
