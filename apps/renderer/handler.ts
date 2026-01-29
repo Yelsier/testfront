@@ -1,9 +1,5 @@
 // handler.ts
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-} from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
@@ -219,65 +215,20 @@ export const handler = awslambda.streamifyResponse(
       const isRscRequest =
         responseHeaders["content-type"]?.includes("text/x-component");
 
-      // Normalizar path para S3 (/ -> index.html, /about -> about.html)
-      const s3Key =
-        path === "/" ? "index.html" : `${path.replace(/^\//, "")}.html`;
-
-      // 1. Intentar servir HTML desde S3 (cache)
-      if (!isRscRequest) {
-        try {
-          const s3Response = await s3.send(
-            new GetObjectCommand({
-              Bucket: BUCKET_NAME,
-              Key: s3Key,
-            }),
-          );
-
-          const htmlContent = await s3Response.Body?.transformToString();
-
-          console.log(`✅ Serving ${s3Key} from S3 cache`);
-
-          respond({
-            statusCode: 200,
-            headers: {
-              "Content-Type": "text/html; charset=utf-8",
-              "Cache-Control": "public, max-age=3600",
-              "X-Cache": "HIT",
-            },
-          });
-
-          if (isHead) {
-            responseStream.end();
-            return;
-          }
-
-          responseStream.write(htmlContent);
-          responseStream.end();
-          return;
-        } catch (error: any) {
-          // Si no existe en S3, continuar con SSR
-          if (error.name !== "NoSuchKey") {
-            console.warn("S3 read error:", error);
-          }
-          console.log(`🔄 Cache miss for ${s3Key}, generating SSR`);
-        }
-      }
-
       console.log(
         `📊 Request: ${path}, isRscRequest: ${isRscRequest}, Content-Type: ${responseHeaders["content-type"]}`,
       );
 
       // 2. Generar HTML con RSC+SSR (solo si no está en cache)
-      // Para RSC, usar el Content-Type correcto y no cachear
+      // Para RSC, usar el Content-Type correcto
       if (isRscRequest) {
         respond({
           statusCode: 200,
           headers: {
             "Content-Type":
               responseHeaders["content-type"] || "text/x-component",
-            "Cache-Control": "no-store",
+            "Cache-Control": responseHeaders["Cache-Control"],
             Vary: "Accept",
-            "X-Cache": "BYPASS",
           },
         });
 
@@ -291,12 +242,11 @@ export const handler = awslambda.streamifyResponse(
         return;
       }
 
-      // Para HTML regular, cachear en S3
       respond({
         statusCode: 200,
         headers: {
           "Content-Type": "text/html; charset=utf-8",
-          "X-Cache": "MISS",
+          "Cache-Control": responseHeaders["Cache-Control"],
         },
       });
 
@@ -305,42 +255,7 @@ export const handler = awslambda.streamifyResponse(
         return;
       }
 
-      const [stream, streamCopy] = body.tee();
-
-      await pipeline(Readable.fromWeb(stream as any), responseStream);
-
-      // 3. Si es estática, guardar en S3 para próximas peticiones
-      const cacheControl =
-        responseHeaders["cache-control"] || responseHeaders["Cache-Control"];
-      const isStatic = !cacheControl?.includes("no-store");
-
-      if (isStatic) {
-        try {
-          const reader = streamCopy.getReader();
-          const chunks: Uint8Array[] = [];
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            chunks.push(value);
-          }
-          const html = new TextDecoder("utf-8").decode(Buffer.concat(chunks));
-
-          // Guardar el HTML en S3 para futuras peticiones
-          await s3.send(
-            new PutObjectCommand({
-              Bucket: BUCKET_NAME,
-              Key: s3Key,
-              Body: html,
-              ContentType: "text/html; charset=utf-8",
-              CacheControl: "public, max-age=3600",
-            }),
-          );
-
-          console.log(`💾 Cached ${s3Key} to S3`);
-        } catch (e) {
-          console.error("⚠️ Background cache failed (ignored):", e);
-        }
-      }
+      await pipeline(Readable.fromWeb(body as any), responseStream);
     } catch (e: any) {
       // Log que NO se rompa aunque e sea undefined
       console.error("💥 Handler crashed:", {

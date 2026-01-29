@@ -132,7 +132,9 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   const cacheControl =
-    data.renderMode === "dynamic" ? "no-store" : "public, max-age=3600";
+    data.renderMode === "dynamic"
+      ? "no-store"
+      : `public, max-age=0, s-maxage=${data.ttl ?? 86400}, stale-while-revalidate=30`;
 
   // respond html
   return new Response(htmlStream, {
