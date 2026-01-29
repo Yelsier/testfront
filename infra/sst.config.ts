@@ -62,14 +62,35 @@ export default $config({
       },
     });
 
+    const publicCachePolicy = new aws.cloudfront.CachePolicy(
+      "PublicCachePolicy",
+      {
+        defaultTtl: 86400,
+        maxTtl: 31536000,
+        minTtl: 0,
+        parametersInCacheKeyAndForwardedToOrigin: {
+          cookiesConfig: { cookieBehavior: "none" },
+          headersConfig: { headerBehavior: "none" },
+          queryStringsConfig: { queryStringBehavior: "all" }, // <-- tu config actual
+          enableAcceptEncodingGzip: true,
+          enableAcceptEncodingBrotli: true,
+        },
+      },
+    );
+
     // 3. CloudFront para distribución global con caching edge
     const cdn = new sst.aws.Router("CdnRouter", {
       routes: {
         "/*": handler.url,
       },
       transform: {
-        cdn: {
-          tags: tags,
+        cdn: (args) => {
+          // SST crea 1 behavior principal; se lo ajustamos
+          args.tags = tags;
+          args.defaultCacheBehavior = {
+            ...args.defaultCacheBehavior,
+            cachePolicyId: publicCachePolicy.id,
+          };
         },
       },
     });
